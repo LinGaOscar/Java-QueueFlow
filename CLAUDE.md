@@ -98,6 +98,7 @@ WAITING → CANCELLED（使用者主動取消）
 - `DELETE /api/events/{eventId}/queue/me?userId=` — 取消候補
 
 ### 管理端
+- `GET /api/admin/events` — 列出所有活動（頁面重整後恢復清單用）
 - `POST /api/admin/events` — 建立活動
 - `POST /api/admin/events/{eventId}/open` — 開啟候補
 - `POST /api/admin/events/{eventId}/close` — 關閉候補
@@ -128,6 +129,8 @@ WAITING → CANCELLED（使用者主動取消）
 - **多次入列查詢**：取消或放行後 Redis user key 被刪除，同一使用者可再次入列。Repository 使用 `findByEventIdAndUserIdAndStatus(..., WAITING)` 而非通用查詢，避免多筆記錄時拋出 non-unique-result exception。
 - **`/me` 歷史查詢**：Redis 無記錄時改用 `findFirstByEventIdAndUserIdOrderByJoinedAtDesc` 回傳最新終態。
 - **Jackson**：設定 `write-dates-as-timestamps=false`，`LocalDateTime` 序列化為 ISO 8601 字串，前端直接用 `new Date(str)` 解析。
+- **靜態資源熱更新**：`mvn spring-boot:run` 從 `target/classes/static` 服務 HTML/JS，編輯 `src/main/resources/static/` 後**必須重啟伺服器**才能生效（瀏覽器強制重新整理不夠）。
+- **前端 inline handler 命名禁忌**：`onclick="fn()"` 的作用域鏈包含 `with(document)`，因此函式名稱不可與瀏覽器 DOM API 重名（例如 `createEvent` 會被解析為 `document.createEvent()` 而非 window 上的自訂函式）。
 
 ## 第二階段擴充（預留）
 
