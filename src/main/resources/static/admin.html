@@ -13,30 +13,26 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #070706;
-  --surface:   #0E0D0C;
-  --surface-2: #161412;
-  --surface-3: #1E1B18;
-  --border:    #252220;
-  --border-2:  #302C28;
-  --amber:     #F59E0B;
-  --amber-dim: rgba(245,158,11,.28);
-  --amber-bg:  rgba(245,158,11,.06);
-  --gold:      #C9963A;
-  --text:      #EDE7DB;
-  --muted:     #695F54;
-  --muted-2:   #9A8E80;
-  --green:     #10B981;
-  --red:       #EF4444;
+  --bg:        #FFFFFF;
+  --surface:   #F9F8F6;
+  --surface-2: #F1EEE9;
+  --surface-3: #E8E3DC;
+  --border:    #E2DDD7;
+  --border-2:  #C9C3BB;
+  --amber:     #B45309;
+  --amber-dim: rgba(180,83,9,.3);
+  --amber-bg:  rgba(180,83,9,.08);
+  --gold:      #92400E;
+  --text:      #1C1917;
+  --muted:     #78716C;
+  --muted-2:   #57534E;
+  --green:     #059669;
+  --red:       #DC2626;
 }
 
+html { font-size: 115%; }
 html, body { height: 100%; background: var(--bg); color: var(--text);
              font-family: 'IBM Plex Mono', monospace; overflow: hidden; }
-
-body::after {
-  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 900;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
-}
 
 /* ── Header ───────────────────────────────────────────────────── */
 header {
@@ -83,7 +79,7 @@ header {
 .step-num {
   font-family: 'Bebas Neue', sans-serif; font-size: 3rem;
   line-height: 1; letter-spacing: .04em;
-  color: rgba(245,158,11,.1); user-select: none;
+  color: rgba(180,83,9,.15); user-select: none;
 }
 
 /* Small label */
@@ -159,7 +155,7 @@ header {
   font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
   cursor: pointer; transition: background .2s, box-shadow .2s;
 }
-.btn-create:hover { background: #FBBA2A; box-shadow: 0 0 12px rgba(245,158,11,.35); }
+.btn-create:hover { background: var(--gold); box-shadow: 0 0 12px rgba(180,83,9,.25); }
 
 /* Event list */
 .ev-list-head {
@@ -212,7 +208,7 @@ header {
   transition: background .15s, box-shadow .15s; background: transparent;
 }
 .btn-ctrl.open-btn  { border-color: var(--amber-dim); color: var(--amber); }
-.btn-ctrl.open-btn:hover  { background: var(--amber-bg); box-shadow: 0 0 10px rgba(245,158,11,.2); }
+.btn-ctrl.open-btn:hover  { background: var(--amber-bg); box-shadow: 0 0 10px rgba(180,83,9,.15); }
 .btn-ctrl.close-btn { border-color: var(--border-2); color: var(--muted-2); }
 .btn-ctrl.close-btn:hover { background: var(--surface-3); }
 .btn-ctrl:disabled { opacity: .3; cursor: not-allowed; }
@@ -258,7 +254,7 @@ header {
   letter-spacing: .16em; text-transform: uppercase; cursor: pointer;
   transition: background .2s, box-shadow .2s; white-space: nowrap;
 }
-.btn-admit:hover { background: #FBBA2A; box-shadow: 0 0 12px rgba(245,158,11,.35); }
+.btn-admit:hover { background: var(--gold); box-shadow: 0 0 12px rgba(180,83,9,.25); }
 .admit-spacer { flex: 1; }
 .btn-refresh {
   padding: 5px 10px; background: transparent; border: 1px solid var(--border);
@@ -282,7 +278,7 @@ thead th {
   font-size: .48rem; letter-spacing: .22em; color: var(--muted);
   text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 400;
 }
-tbody tr { border-bottom: 1px solid rgba(37,34,32,.6); transition: background .1s; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
 tbody tr:hover { background: var(--surface-2); }
 tbody tr.dim { opacity: .35; }
 td { padding: 8px 14px; font-size: .68rem; letter-spacing: .03em; }
@@ -484,7 +480,8 @@ async function createEvent() {
     A.events.unshift(r.data);
     renderList();
     toast(`活動「${r.data.name}」建立成功`, 'ok');
-    ['fName','fCap','fOpen','fClose'].forEach(id => document.getElementById(id).value = '');
+    ['fName','fCap'].forEach(id => document.getElementById(id).value = '');
+    fillDefaultDates();
     document.getElementById('createToggle').classList.remove('open');
     document.getElementById('createForm').classList.remove('open');
     selectEvent(r.data.id);
@@ -647,8 +644,19 @@ function connectWs(eventId) {
   A.stomp = client;
 }
 
+/* ── 日期預設：今日開始，五天後結束 ── */
+function fillDefaultDates() {
+  const now = new Date();
+  const pad2 = n => String(n).padStart(2, '0');
+  const fmt  = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const end  = new Date(now); end.setDate(end.getDate() + 5);
+  document.getElementById('fOpen').value  = `${fmt(now)}T00:00`;
+  document.getElementById('fClose').value = `${fmt(end)}T23:59`;
+}
+
 /* ── Bootstrap: 啟動載入活動列表 ── */
 (async function bootstrap() {
+  fillDefaultDates();
   const r = await req('/api/admin/events');
   if (r.success && r.data.length) {
     A.events = r.data.sort((a, b) => b.id - a.id);
