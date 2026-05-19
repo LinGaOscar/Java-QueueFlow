@@ -13,144 +13,187 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:          #080706;
-  --surface:     #0F0E0C;
-  --surface-2:   #191712;
-  --border:      #272320;
-  --amber:       #F59E0B;
-  --amber-dim:   rgba(245,158,11,.3);
-  --amber-glow:  rgba(245,158,11,.08);
-  --gold:        #C9963A;
-  --text:        #EEE8DC;
-  --muted:       #6B6358;
-  --green:       #10B981;
-  --red:         #EF4444;
+  --bg:         #080706;
+  --surface:    #0F0E0C;
+  --surface-2:  #191712;
+  --border:     #272320;
+  --amber:      #F59E0B;
+  --amber-dim:  rgba(245,158,11,.28);
+  --amber-glow: rgba(245,158,11,.07);
+  --gold:       #C9963A;
+  --text:       #EEE8DC;
+  --muted:      #6B6358;
+  --green:      #10B981;
+  --red:        #EF4444;
 }
 
 html, body { height: 100%; background: var(--bg); color: var(--text);
-             font-family: 'IBM Plex Mono', monospace; overflow-x: hidden; }
+             font-family: 'IBM Plex Mono', monospace; overflow: hidden; }
 
-/* noise + scanlines */
-body::before {
-  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 900;
-  background: repeating-linear-gradient(to bottom, transparent 0, transparent 3px,
-    rgba(0,0,0,.04) 3px, rgba(0,0,0,.04) 4px);
-}
 body::after {
-  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 899;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
-  opacity: .5;
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 900;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
 }
 
-/* ambient glow */
+/* Ambient glow when in queue */
 .glow-bg {
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse 60% 50% at 50% 48%,
-    rgba(245,158,11,.07) 0%, transparent 70%);
+  background: radial-gradient(ellipse 55% 45% at 50% 50%, rgba(245,158,11,.07) 0%, transparent 70%);
   opacity: 0; transition: opacity 1.2s ease;
 }
 .glow-bg.active { opacity: 1; }
 
-/* ─── Header ─────────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────────────────────────────── */
 header {
-  position: relative; z-index: 10;
+  position: relative; z-index: 10; height: 48px;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 28px; border-bottom: 1px solid var(--border);
-  gap: 16px;
+  padding: 0 24px; border-bottom: 1px solid var(--border);
 }
-.logo { font-family: 'Cormorant SC', serif; font-size: 1rem;
-        font-weight: 600; letter-spacing: .35em; color: var(--amber);
-        white-space: nowrap; flex-shrink: 0; }
-.logo em { color: var(--muted); font-style: normal; font-weight: 400; }
+.logo { font-family: 'Cormorant SC', serif; font-size: .95rem;
+        font-weight: 600; letter-spacing: .35em; color: var(--amber); }
+.logo em { color: var(--muted); font-style: normal; }
+.ws-pill { display: flex; align-items: center; gap: 7px; }
+.ws-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.ws-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 4px var(--green)} 50%{box-shadow:0 0 10px var(--green)} }
+.ws-label { font-size: .58rem; color: var(--muted); letter-spacing: .08em; }
+.ws-label.live { color: var(--green); }
 
-/* 連線列 — 正中央 */
-.connect-bar {
-  display: flex; align-items: center; gap: 8px;
-  flex: 1; max-width: 560px; margin: 0 auto;
+/* ── 3-column step layout ─────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr 1fr;
+  height: calc(100vh - 48px);
+  position: relative; z-index: 1;
 }
-.connect-bar input {
+
+/* Each step column */
+.step {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.step:last-child { border-right: none; }
+
+/* Connector chevron between steps */
+.step:not(:last-child)::after {
+  content: '›';
+  position: absolute; right: -9px; top: 50%;
+  transform: translateY(-50%);
+  font-size: .9rem; color: var(--amber-dim);
+  background: var(--bg); padding: 4px 0;
+  line-height: 1; z-index: 2;
+}
+
+/* Step ghost number */
+.step-num {
+  font-family: 'Bebas Neue', sans-serif; font-size: 3.2rem;
+  line-height: 1; letter-spacing: .04em;
+  color: rgba(245,158,11,.1); user-select: none;
+}
+
+/* Step tag (small label) */
+.step-tag {
+  font-size: .48rem; letter-spacing: .32em;
+  text-transform: uppercase; color: var(--amber);
+}
+
+/* Step body (main content area) */
+.step-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+/* Step hint (instruction text) */
+.step-hint {
+  font-size: .56rem; color: var(--muted);
+  letter-spacing: .06em; line-height: 1.75;
+}
+
+/* ── Step A (01, 03): num+tag top ─ accent top ─ hint bottom ─── */
+.step-a::before {
+  content: ''; position: absolute; top: 0; left: 24px;
+  width: 36px; height: 2px; background: var(--amber);
+}
+.step-a .step-num  { padding: 22px 24px 2px; }
+.step-a .step-tag  { padding: 0 24px 0; margin-bottom: 20px; }
+.step-a .step-body { padding: 0 24px; }
+.step-a .step-hint { padding: 16px 24px 22px; border-top: 1px solid var(--border); margin-top: 16px; }
+
+/* ── Step B (02): hint top ─ accent bottom ─ num+tag bottom ──── */
+.step-b::before {
+  content: ''; position: absolute; bottom: 0; right: 24px;
+  width: 36px; height: 2px; background: var(--amber);
+}
+.step-b .step-hint { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
+.step-b .step-body { padding: 0 24px; }
+.step-b .step-tag  { padding: 0 24px 2px; text-align: right; margin-top: 20px; }
+.step-b .step-num  { padding: 0 24px 22px; text-align: right; }
+
+/* ── Step 1: connection form ──────────────────────────────────── */
+.field-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field-lbl { font-size: .48rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+.field-inp {
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text); font-family: 'IBM Plex Mono', monospace;
-  font-size: .72rem; padding: 7px 10px; outline: none;
-  transition: border-color .2s; min-width: 0;
+  font-size: .75rem; padding: 8px 10px; outline: none;
+  transition: border-color .2s; width: 100%;
 }
-.connect-bar input:focus { border-color: var(--amber-dim); }
-.in-event { width: 72px; flex-shrink: 0; }
-.in-user  { flex: 1; }
+.field-inp:focus { border-color: var(--amber-dim); }
 .btn-connect {
-  padding: 7px 16px; background: transparent;
-  border: 1px solid var(--amber-dim); color: var(--amber);
-  font-family: 'IBM Plex Mono', monospace; font-size: .65rem;
-  letter-spacing: .15em; text-transform: uppercase; cursor: pointer;
-  transition: background .2s; white-space: nowrap; flex-shrink: 0;
+  width: 100%; margin-top: 4px; padding: 10px;
+  background: transparent; border: 1px solid var(--amber-dim);
+  color: var(--amber); font-family: 'IBM Plex Mono', monospace;
+  font-size: .68rem; letter-spacing: .2em; text-transform: uppercase;
+  cursor: pointer; transition: background .2s;
 }
 .btn-connect:hover { background: var(--amber-glow); }
 
-.header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.ws-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
-.ws-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.ws-label { font-size: .6rem; letter-spacing: .08em; color: var(--muted); }
-.ws-label.live { color: var(--green); }
-
-/* ─── Stage ─────────────────────────────────────────────────────── */
-.stage {
-  position: relative; z-index: 1;
-  height: calc(100vh - 53px);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 20px;
+.connected-info {
+  margin-top: 18px; padding: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  display: none;
 }
+.connected-info .ci-label { font-size: .46rem; letter-spacing: .22em; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+.connected-info .ci-val   { font-size: .72rem; color: var(--text); word-break: break-all; }
 
-.event-meta { text-align: center; margin-bottom: 36px; }
-.event-meta .label { font-size: .55rem; letter-spacing: .3em; color: var(--muted);
-                     text-transform: uppercase; margin-bottom: 4px; }
-.event-meta .name { font-family: 'Cormorant SC', serif; font-size: 1.4rem;
-                    font-weight: 600; letter-spacing: .08em; color: var(--text); }
-
-/* Ticket frame */
+/* ── Step 2: ticket + action ─────────────────────────────────── */
 .ticket {
   position: relative; display: flex; flex-direction: column;
-  align-items: center; padding: 36px 64px 28px;
+  align-items: center; padding: 20px 32px 16px;
   background: var(--surface); border: 1px solid var(--border);
-  min-width: 300px; margin-bottom: 24px;
+  margin-bottom: 14px;
 }
-.ticket::before, .ticket::after { content: ''; position: absolute; width: 16px; height: 16px; }
-.ticket::before { top: -1px; left: -1px;
-  border-top: 2px solid var(--amber-dim); border-left: 2px solid var(--amber-dim); }
-.ticket::after  { bottom: -1px; right: -1px;
-  border-bottom: 2px solid var(--amber-dim); border-right: 2px solid var(--amber-dim); }
-.ticket .corner-br { position: absolute; top: -1px; right: -1px; width: 16px; height: 16px;
-  border-top: 2px solid var(--amber-dim); border-right: 2px solid var(--amber-dim); }
-.ticket .corner-bl { position: absolute; bottom: -1px; left: -1px; width: 16px; height: 16px;
-  border-bottom: 2px solid var(--amber-dim); border-left: 2px solid var(--amber-dim); }
+.ticket::before, .ticket::after { content: ''; position: absolute; width: 13px; height: 13px; }
+.ticket::before { top:-1px; left:-1px; border-top:2px solid var(--amber-dim); border-left:2px solid var(--amber-dim); }
+.ticket::after  { bottom:-1px; right:-1px; border-bottom:2px solid var(--amber-dim); border-right:2px solid var(--amber-dim); }
+.ticket .cbr { position:absolute; top:-1px; right:-1px; width:13px; height:13px; border-top:2px solid var(--amber-dim); border-right:2px solid var(--amber-dim); }
+.ticket .cbl { position:absolute; bottom:-1px; left:-1px; width:13px; height:13px; border-bottom:2px solid var(--amber-dim); border-left:2px solid var(--amber-dim); }
 
-.ticket-label { font-size: .52rem; letter-spacing: .45em; color: var(--gold);
-                text-transform: uppercase; margin-bottom: 2px; }
+.ticket-label { font-size: .46rem; letter-spacing: .4em; color: var(--gold); text-transform: uppercase; margin-bottom: 2px; }
 .queue-num {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(96px, 20vw, 180px);
-  line-height: .82; letter-spacing: -.01em;
+  font-size: clamp(68px, 11vw, 144px);
+  line-height: .85; letter-spacing: -.01em;
   color: var(--amber);
-  text-shadow: 0 0 30px rgba(245,158,11,.55), 0 0 80px rgba(245,158,11,.2);
-  transition: opacity .12s ease, transform .12s ease;
-  user-select: none;
+  text-shadow: 0 0 26px rgba(245,158,11,.52), 0 0 60px rgba(245,158,11,.18);
+  transition: opacity .12s, transform .12s; user-select: none;
 }
-.queue-num.idle { color: var(--border); text-shadow: none; font-size: clamp(68px,14vw,128px); }
-.queue-num.flip { opacity: 0; transform: translateY(-8px) scaleY(.92); }
+.queue-num.idle { color: var(--border); text-shadow: none; font-size: clamp(52px, 8vw, 108px); }
+.queue-num.flip { opacity: 0; transform: translateY(-6px) scaleY(.94); }
 
-.ahead { margin-top: 8px; font-size: .65rem; letter-spacing: .15em; color: var(--muted); visibility: hidden; }
+.ahead { font-size: .6rem; letter-spacing: .14em; color: var(--muted);
+         visibility: hidden; margin-top: 6px; }
 .ahead strong { color: var(--gold); font-weight: 500; }
 
-/* Status badge */
 .badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 5px 14px; border: 1px solid; font-size: .58rem;
-  letter-spacing: .25em; text-transform: uppercase; margin-top: 16px;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 12px; border: 1px solid;
+  font-size: .54rem; letter-spacing: .22em; text-transform: uppercase;
+  margin-bottom: 12px; align-self: center;
 }
 .badge .dot { width: 5px; height: 5px; border-radius: 50%; }
 .badge.idle     { border-color: var(--border); color: var(--muted); }
 .badge.idle     .dot { background: var(--muted); }
 .badge.waiting  { border-color: var(--amber-dim); color: var(--amber); }
-.badge.waiting  .dot { background: var(--amber); animation: blink 1.4s ease-in-out infinite; }
+.badge.waiting  .dot { background: var(--amber); animation: blink 1.4s infinite; }
 .badge.admitted { border-color: rgba(16,185,129,.4); color: var(--green); }
 .badge.admitted .dot { background: var(--green); }
 .badge.expired,
@@ -158,69 +201,80 @@ header {
 .badge.expired .dot, .badge.cancelled .dot { background: var(--red); }
 
 @keyframes blink {
-  0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
-  50%      { opacity:.6; box-shadow: 0 0 0 5px rgba(245,158,11,0); }
+  0%,100% { opacity:1; box-shadow:0 0 0 0 rgba(245,158,11,.5); }
+  50%      { opacity:.6; box-shadow:0 0 0 4px rgba(245,158,11,0); }
 }
 
-/* Action button */
-.btn {
-  margin-top: 28px; padding: 14px 52px;
-  font-family: 'IBM Plex Mono', monospace; font-size: .78rem;
+.btn-action {
+  width: 100%; padding: 12px;
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem;
   font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
   border: none; cursor: pointer;
   transition: background .2s, box-shadow .2s, transform .1s;
 }
-.btn.join { background: var(--amber); color: var(--bg); }
-.btn.join:hover { background: #FBBA2A; box-shadow: 0 0 22px rgba(245,158,11,.4); }
-.btn.cancel { background: transparent; border: 1px solid rgba(239,68,68,.4); color: var(--red); }
-.btn.cancel:hover { background: rgba(239,68,68,.06); }
-.btn:active { transform: scale(.98); }
-.btn:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed;
-                border: 1px solid var(--border); box-shadow: none; }
+.btn-action.join   { background: var(--amber); color: var(--bg); }
+.btn-action.join:hover { background: #FBBA2A; box-shadow: 0 0 20px rgba(245,158,11,.4); }
+.btn-action.cancel { background: transparent; border: 1px solid rgba(239,68,68,.4); color: var(--red); }
+.btn-action.cancel:hover { background: rgba(239,68,68,.06); }
+.btn-action:active { transform: scale(.98); }
+.btn-action:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed;
+                       border: 1px solid var(--border); box-shadow: none; }
 
-/* ─── Toast ─────────────────────────────────────────────────────── */
-.toasts { position: fixed; top: 64px; right: 20px; z-index: 1000;
+/* ── Step 3: status panels ───────────────────────────────────── */
+.status-card {
+  padding: 12px 14px; background: var(--surface);
+  border: 1px solid var(--border); margin-bottom: 8px;
+}
+.status-card .sc-label { font-size: .46rem; letter-spacing: .22em; color: var(--muted);
+                          text-transform: uppercase; margin-bottom: 5px; }
+.status-card .sc-val   { font-size: .75rem; letter-spacing: .04em; word-break: break-all; }
+.status-card .sc-val.live { color: var(--green); }
+.status-card .sc-val.amber { color: var(--amber); }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.toasts { position: fixed; top: 58px; right: 14px; z-index: 1000;
           display: flex; flex-direction: column; gap: 6px; }
 .toast {
-  padding: 10px 18px; background: var(--surface-2);
-  border-left: 3px solid var(--amber); font-size: .68rem;
-  letter-spacing: .04em; max-width: 280px;
-  animation: toastIn .25s ease, toastOut .3s ease 2.7s forwards;
+  padding: 9px 15px; background: var(--surface-2);
+  border-left: 3px solid var(--amber); font-size: .65rem;
+  letter-spacing: .04em; max-width: 260px;
+  animation: tIn .22s ease, tOut .3s ease 2.7s forwards;
 }
 .toast.err { border-left-color: var(--red); }
 .toast.ok  { border-left-color: var(--green); }
-@keyframes toastIn  { from { opacity:0; transform: translateX(12px); } }
-@keyframes toastOut { to   { opacity:0; transform: translateX(8px); } }
+@keyframes tIn  { from { opacity:0; transform:translateX(10px); } }
+@keyframes tOut { to   { opacity:0; } }
 
-/* ─── Admitted overlay ───────────────────────────────────────────── */
+/* ── Admitted overlay ────────────────────────────────────────── */
 .overlay {
   display: none; position: fixed; inset: 0; z-index: 800;
-  background: rgba(8,7,6,.92); flex-direction: column;
-  align-items: center; justify-content: center; gap: 20px;
+  background: rgba(8,7,6,.93);
+  flex-direction: column; align-items: center; justify-content: center; gap: 16px;
 }
 .overlay.show { display: flex; animation: fadeIn .6s ease; }
 @keyframes fadeIn { from { opacity: 0; } }
 .overlay-title {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(52px,12vw,108px);
+  font-size: clamp(48px, 10vw, 100px);
   color: var(--green); letter-spacing: .05em;
   text-shadow: 0 0 40px rgba(16,185,129,.5);
 }
-.overlay-sub { font-size: .72rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+.overlay-sub { font-size: .68rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
 .btn-dismiss {
-  margin-top: 16px; padding: 9px 28px; background: transparent;
+  margin-top: 12px; padding: 8px 24px; background: transparent;
   border: 1px solid var(--border); color: var(--muted);
-  font-family: 'IBM Plex Mono', monospace; font-size: .68rem;
+  font-family: 'IBM Plex Mono', monospace; font-size: .65rem;
   letter-spacing: .15em; cursor: pointer; transition: border-color .2s, color .2s;
 }
 .btn-dismiss:hover { border-color: var(--muted); color: var(--text); }
 
-@media (max-width: 600px) {
-  header { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
-  .connect-bar { order: 3; width: 100%; max-width: none; }
-  .logo { order: 1; }
-  .header-right { order: 2; }
-  .ticket { padding: 28px 32px; min-width: 260px; }
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; height: auto; }
+  .step { border-right: none; border-bottom: 1px solid var(--border); min-height: 260px; }
+  .step:last-child { border-bottom: none; }
+  .step:not(:last-child)::after { display: none; }
+  html, body { overflow: auto; }
 }
 </style>
 </head>
@@ -229,39 +283,91 @@ header {
 
 <header>
   <div class="logo">Queue<em>Flow</em></div>
-
-  <!-- 主要操作：連線列集中在 header 正中央 -->
-  <div class="connect-bar">
-    <input class="in-event" type="number" id="evInput" placeholder="活動ID" min="1" title="活動 ID">
-    <input class="in-user"  type="text"   id="uidInput" placeholder="使用者 ID（留空自動產生）">
-    <button class="btn-connect" onclick="connect()">連線</button>
-  </div>
-
-  <div class="header-right">
+  <div class="ws-pill">
     <div class="ws-dot" id="wsDot"></div>
-    <span class="ws-label" id="wsStatus">未連線</span>
+    <span class="ws-label" id="wsLabel">未連線</span>
   </div>
 </header>
 
-<main class="stage">
-  <div class="event-meta">
-    <div class="label">活動</div>
-    <div class="name" id="eventName">— 請在上方輸入活動 ID 後按連線 —</div>
+<div class="layout">
+
+  <!-- ══ STEP 01：連線設定（奇數：數字上，提示下）══ -->
+  <div class="step step-a">
+    <div class="step-num">01</div>
+    <div class="step-tag">連線設定</div>
+
+    <div class="step-body">
+      <div class="field-row">
+        <div class="field-lbl">活動 ID</div>
+        <input class="field-inp" type="number" id="evInput" placeholder="1" min="1">
+      </div>
+      <div class="field-row">
+        <div class="field-lbl">使用者 ID</div>
+        <input class="field-inp" type="text" id="uidInput" placeholder="留空自動產生">
+      </div>
+      <button class="btn-connect" onclick="connect()">連線</button>
+
+      <div class="connected-info" id="connectedInfo">
+        <div class="ci-label">已連線活動</div>
+        <div class="ci-val" id="connectedEv">—</div>
+      </div>
+    </div>
+
+    <div class="step-hint">
+      輸入活動 ID 後按連線<br>
+      使用者 ID 留空將自動產生<br>
+      Enter 鍵可快速連線
+    </div>
   </div>
 
-  <div class="ticket">
-    <div class="corner-br"></div><div class="corner-bl"></div>
-    <div class="ticket-label">候補號碼</div>
-    <div class="queue-num idle" id="qNum">—</div>
-    <div class="ahead" id="ahead">前方 <strong id="aheadN">0</strong> 人等待</div>
+  <!-- ══ STEP 02：候補操作（偶數：提示上，數字下）══ -->
+  <div class="step step-b">
+    <div class="step-hint">連線成功後點擊加入候補，系統即時顯示您的排隊號碼</div>
+
+    <div class="step-body">
+      <div class="ticket">
+        <div class="cbr"></div><div class="cbl"></div>
+        <div class="ticket-label">候補號碼</div>
+        <div class="queue-num idle" id="qNum">—</div>
+        <div class="ahead" id="ahead">前方 <strong id="aheadN">0</strong> 人等待</div>
+      </div>
+      <div class="badge idle" id="badge">
+        <div class="dot"></div><span id="badgeText">尚未加入</span>
+      </div>
+      <button class="btn-action join" id="actionBtn" onclick="handleAction()">加入候補</button>
+    </div>
+
+    <div class="step-tag">候補操作</div>
+    <div class="step-num">02</div>
   </div>
 
-  <div class="badge idle" id="badge">
-    <div class="dot"></div><span id="badgeText">尚未加入</span>
+  <!-- ══ STEP 03：狀態追蹤（奇數：數字上，提示下）══ -->
+  <div class="step step-a">
+    <div class="step-num">03</div>
+    <div class="step-tag">狀態追蹤</div>
+
+    <div class="step-body">
+      <div class="status-card">
+        <div class="sc-label">連線狀態</div>
+        <div class="sc-val" id="connStatus">— 尚未連線</div>
+      </div>
+      <div class="status-card">
+        <div class="sc-label">候補狀態</div>
+        <div class="sc-val amber" id="queueStatus">— 尚未加入</div>
+      </div>
+      <div class="status-card">
+        <div class="sc-label">使用者</div>
+        <div class="sc-val" id="userDisplay" style="font-size:.62rem">—</div>
+      </div>
+    </div>
+
+    <div class="step-hint">
+      管理員放行後系統即時彈出通知<br>
+      保持頁面開啟即可接收推播
+    </div>
   </div>
 
-  <button class="btn join" id="actionBtn" onclick="handleAction()">加入候補</button>
-</main>
+</div>
 
 <div class="toasts" id="toasts"></div>
 
@@ -279,26 +385,33 @@ const S = { userId: null, eventId: null, status: 'NOT_JOINED', stomp: null };
   if (!uid) { uid = 'u_' + Math.random().toString(36).slice(2, 9); localStorage.setItem('qf_uid', uid); }
   S.userId = uid;
   document.getElementById('uidInput').value = uid;
-  // 若有上次連線的活動 ID 自動填入
+  document.getElementById('userDisplay').textContent = uid;
   const lastEv = localStorage.getItem('qf_evid');
   if (lastEv) document.getElementById('evInput').value = lastEv;
 })();
 
-// Enter 鍵快速連線
-document.getElementById('evInput').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+document.getElementById('evInput').addEventListener('keydown',  e => { if (e.key === 'Enter') connect(); });
 document.getElementById('uidInput').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
 async function connect() {
   const customUid = document.getElementById('uidInput').value.trim();
-  if (customUid) { S.userId = customUid; localStorage.setItem('qf_uid', customUid); }
-
+  if (customUid) {
+    S.userId = customUid;
+    localStorage.setItem('qf_uid', customUid);
+    document.getElementById('userDisplay').textContent = customUid;
+  }
   const evId = parseInt(document.getElementById('evInput').value);
   if (!evId) { toast('請輸入有效的活動 ID', 'err'); return; }
   S.eventId = evId;
   localStorage.setItem('qf_evid', evId);
 
+  const info = document.getElementById('connectedInfo');
+  document.getElementById('connectedEv').textContent = `活動 #${evId}`;
+  info.style.display = '';
+
   if (S.stomp) { try { S.stomp.deactivate(); } catch(_) {} }
   setWs('連線中…', false);
+  document.getElementById('connStatus').textContent = '… 連線中';
   initWs();
   await refreshPos();
 }
@@ -309,6 +422,8 @@ function initWs() {
     reconnectDelay: 4000,
     onConnect: () => {
       setWs('即時連線', true);
+      document.getElementById('connStatus').textContent = '● 即時連線中';
+      document.getElementById('connStatus').className = 'sc-val live';
       client.subscribe(`/topic/events/${S.eventId}/queue`, () => { if (S.status === 'WAITING') refreshPos(); });
       client.subscribe(`/topic/users/${S.userId}/queue-status`, m => {
         const d = JSON.parse(m.body);
@@ -316,16 +431,23 @@ function initWs() {
         else if (d.status === 'EXPIRED') { render('EXPIRED', null, null); toast('您的候補已逾時失效', 'err'); }
       });
     },
-    onDisconnect: () => setWs('已斷線', false),
-    onStompError: () => setWs('連線錯誤', false),
+    onDisconnect: () => {
+      setWs('已斷線', false);
+      document.getElementById('connStatus').textContent = '— 已斷線';
+      document.getElementById('connStatus').className = 'sc-val';
+    },
+    onStompError: () => {
+      setWs('連線錯誤', false);
+      document.getElementById('connStatus').textContent = '× 連線錯誤';
+    },
   });
   client.activate();
   S.stomp = client;
 }
 
 function setWs(txt, live) {
-  document.getElementById('wsStatus').textContent = txt;
-  document.getElementById('wsStatus').className = 'ws-label' + (live ? ' live' : '');
+  document.getElementById('wsLabel').textContent = txt;
+  document.getElementById('wsLabel').className = 'ws-label' + (live ? ' live' : '');
   document.getElementById('wsDot').className = 'ws-dot' + (live ? ' live' : '');
 }
 
@@ -348,7 +470,7 @@ async function handleAction() {
       else toast(r.message || '取消失敗', 'err');
     } else {
       const r = await req(`/api/events/${S.eventId}/queue/join?userId=${encodeURIComponent(S.userId)}`, 'POST');
-      if (r.success) { render('WAITING', r.data.position, r.data.ahead); toast(`已加入！您的號碼 ${r.data.position}`, 'ok'); }
+      if (r.success) { render('WAITING', r.data.position, r.data.ahead); toast(`已加入！號碼 ${r.data.position}`, 'ok'); }
       else toast(r.message || '加入失敗', 'err');
     }
   } catch(_) { toast('網路錯誤', 'err'); }
@@ -362,6 +484,7 @@ function render(status, pos, ahead) {
   const badge   = document.getElementById('badge');
   const btn     = document.getElementById('actionBtn');
   const glow    = document.getElementById('glowBg');
+  const qStatus = document.getElementById('queueStatus');
 
   const newTxt = pos ? String(pos) : '—';
   if (numEl.textContent !== newTxt) {
@@ -374,22 +497,22 @@ function render(status, pos, ahead) {
   document.getElementById('aheadN').textContent = ahead ?? 0;
 
   const map = {
-    WAITING:    { cls: 'waiting',  txt: '等待中' },
-    ADMITTED:   { cls: 'admitted', txt: '已放行' },
-    EXPIRED:    { cls: 'expired',  txt: '已逾時' },
-    CANCELLED:  { cls: 'cancelled',txt: '已取消' },
-    NOT_JOINED: { cls: 'idle',     txt: '尚未加入' },
+    WAITING:    { cls:'waiting',   txt:'等待中',   qs:`等候中，排隊號碼 ${pos}` },
+    ADMITTED:   { cls:'admitted',  txt:'已放行',   qs:'已放行，請前往入口' },
+    EXPIRED:    { cls:'expired',   txt:'已逾時',   qs:'候補已逾時失效' },
+    CANCELLED:  { cls:'cancelled', txt:'已取消',   qs:'候補已取消' },
+    NOT_JOINED: { cls:'idle',      txt:'尚未加入', qs:'— 尚未加入' },
   };
   const s = map[status] || map.NOT_JOINED;
   badge.className = 'badge ' + s.cls;
   document.getElementById('badgeText').textContent = s.txt;
+  qStatus.textContent = s.qs;
 
-  if (status === 'WAITING')   { btn.textContent = '取消候補'; btn.className = 'btn cancel'; btn.disabled = false; }
-  else if (status === 'ADMITTED') { btn.textContent = '已放行'; btn.className = 'btn join'; btn.disabled = true; }
-  else { btn.textContent = '加入候補'; btn.className = 'btn join'; btn.disabled = false; }
+  if (status === 'WAITING')       { btn.textContent = '取消候補'; btn.className = 'btn-action cancel'; btn.disabled = false; }
+  else if (status === 'ADMITTED') { btn.textContent = '已放行';   btn.className = 'btn-action join';   btn.disabled = true; }
+  else { btn.textContent = '加入候補'; btn.className = 'btn-action join'; btn.disabled = false; }
 }
 
-// 連線後自動更新活動名稱（查詢 position 時會取得 eventId 上下文）
 async function req(url, method = 'GET', body) {
   const opts = { method, headers: {} };
   if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
@@ -400,7 +523,7 @@ async function req(url, method = 'GET', body) {
 function toast(msg, type = '') {
   const el = document.createElement('div');
   el.className = 'toast ' + type; el.textContent = msg;
-  const c = document.getElementById('toasts'); c.appendChild(el);
+  document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 3100);
 }
 </script>

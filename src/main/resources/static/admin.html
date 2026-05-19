@@ -38,114 +38,178 @@ body::after {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
 }
 
-/* ─── Layout ─────────────────────────────────────────────────────── */
-.layout { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
-
-/* ─── Sidebar ────────────────────────────────────────────────────── */
-.sidebar {
-  border-right: 1px solid var(--border); overflow-y: auto;
-  display: flex; flex-direction: column;
-  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-}
-.sidebar::-webkit-scrollbar { width: 4px; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--border); }
-
-.sidebar-head {
-  padding: 14px 16px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+/* ── Header ───────────────────────────────────────────────────── */
+header {
+  height: 48px; position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; border-bottom: 1px solid var(--border);
 }
 .logo { font-family: 'Cormorant SC', serif; font-size: .95rem;
         font-weight: 600; letter-spacing: .3em; color: var(--amber); }
 .logo em { color: var(--muted); font-style: normal; }
-.admin-chip {
-  font-size: .48rem; letter-spacing: .18em; padding: 2px 7px;
-  border: 1px solid var(--amber-dim); color: var(--gold); text-transform: uppercase;
+.admin-chip { font-size: .46rem; letter-spacing: .2em; padding: 2px 7px;
+              border: 1px solid var(--amber-dim); color: var(--gold); text-transform: uppercase; }
+.ws-pill { display: flex; align-items: center; gap: 7px; }
+.ws-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.ws-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.ws-label { font-size: .56rem; color: var(--muted); letter-spacing: .08em; }
+.ws-label.live { color: var(--green); }
+
+/* ── 3-column step layout ─────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 230px 250px 1fr;
+  height: calc(100vh - 48px);
+  position: relative; z-index: 1;
 }
 
-/* 建立活動 — 可折疊 */
+.step {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.step:last-child { border-right: none; }
+
+.step:not(:last-child)::after {
+  content: '›';
+  position: absolute; right: -9px; top: 50%;
+  transform: translateY(-50%);
+  font-size: .9rem; color: var(--amber-dim);
+  background: var(--bg); padding: 4px 0;
+  line-height: 1; z-index: 2;
+}
+
+/* Ghost step number */
+.step-num {
+  font-family: 'Bebas Neue', sans-serif; font-size: 3rem;
+  line-height: 1; letter-spacing: .04em;
+  color: rgba(245,158,11,.1); user-select: none;
+}
+
+/* Small label */
+.step-tag {
+  font-size: .46rem; letter-spacing: .3em;
+  text-transform: uppercase; color: var(--amber);
+}
+
+.step-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.step-hint {
+  font-size: .54rem; color: var(--muted);
+  letter-spacing: .06em; line-height: 1.75;
+}
+
+/* ── Step A (01, 03): num top, accent top, hint bottom ───────── */
+.step-a::before {
+  content: ''; position: absolute; top: 0; left: 20px;
+  width: 32px; height: 2px; background: var(--amber);
+}
+.step-a .step-num  { padding: 20px 20px 2px; }
+.step-a .step-tag  { padding: 0 20px 0; margin-bottom: 16px; }
+.step-a .step-body { padding: 0; }
+.step-a .step-hint { padding: 14px 20px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+/* ── Step B (02): hint top, accent bottom, num bottom ─────────── */
+.step-b::before {
+  content: ''; position: absolute; bottom: 0; right: 20px;
+  width: 32px; height: 2px; background: var(--amber);
+}
+.step-b .step-hint { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.step-b .step-body { padding: 0; }
+.step-b .step-tag  { padding: 0 20px 2px; text-align: right; flex-shrink: 0; margin-top: 16px; }
+.step-b .step-num  { padding: 0 20px 20px; text-align: right; flex-shrink: 0; }
+
+/* ── Step 1 internals ────────────────────────────────────────── */
+.s1-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 20px; }
+
+/* Create form toggle */
 .create-toggle {
-  width: 100%; padding: 10px 16px; background: none; border: none;
-  border-bottom: 1px solid var(--border); color: var(--muted-2);
-  font-family: 'IBM Plex Mono', monospace; font-size: .6rem;
-  letter-spacing: .2em; text-transform: uppercase; text-align: left;
-  cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 0; cursor: pointer; border: none; background: none;
+  color: var(--muted-2); font-family: 'IBM Plex Mono', monospace;
+  font-size: .56rem; letter-spacing: .18em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border); margin-bottom: 0; width: 100%;
   transition: color .15s;
 }
 .create-toggle:hover { color: var(--amber); }
-.create-toggle .arrow { transition: transform .2s; }
+.create-toggle .arrow { transition: transform .2s; display: inline-block; }
 .create-toggle.open .arrow { transform: rotate(90deg); }
 
 .create-form {
-  overflow: hidden; max-height: 0; transition: max-height .25s ease;
-  border-bottom: 1px solid var(--border);
+  overflow: hidden; max-height: 0;
+  transition: max-height .25s ease;
 }
-.create-form.open { max-height: 360px; }
-.create-form-inner { padding: 14px 16px; }
+.create-form.open { max-height: 300px; }
+.create-form-inner { padding: 12px 0; border-bottom: 1px solid var(--border); }
 
-.field { margin-bottom: 9px; }
-.field label { display: block; font-size: .55rem; letter-spacing: .15em;
+.field { margin-bottom: 8px; }
+.field label { display: block; font-size: .46rem; letter-spacing: .18em;
                color: var(--muted-2); margin-bottom: 3px; text-transform: uppercase; }
 .field input {
   width: 100%; background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: .72rem;
-  padding: 6px 9px; outline: none; transition: border-color .2s;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace;
+  font-size: .72rem; padding: 6px 8px; outline: none; transition: border-color .2s;
 }
 .field input:focus { border-color: var(--amber-dim); }
 
 .btn-create {
-  width: 100%; margin-top: 4px; padding: 9px;
+  width: 100%; margin-top: 4px; padding: 8px;
   background: var(--amber); border: none; color: var(--bg);
-  font-family: 'IBM Plex Mono', monospace; font-size: .68rem;
+  font-family: 'IBM Plex Mono', monospace; font-size: .65rem;
   font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
   cursor: pointer; transition: background .2s, box-shadow .2s;
 }
-.btn-create:hover { background: #FBBA2A; box-shadow: 0 0 14px rgba(245,158,11,.35); }
+.btn-create:hover { background: #FBBA2A; box-shadow: 0 0 12px rgba(245,158,11,.35); }
 
-/* 活動列表 */
+/* Event list */
 .ev-list-head {
-  padding: 8px 16px 6px; font-size: .52rem; letter-spacing: .28em;
-  color: var(--muted); text-transform: uppercase;
+  padding: 10px 0 6px; font-size: .46rem; letter-spacing: .26em;
+  color: var(--muted); text-transform: uppercase; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); margin-bottom: 6px;
 }
-.ev-list { padding: 0 10px 10px; flex: 1; }
+.ev-list { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.ev-list::-webkit-scrollbar { width: 3px; }
+.ev-list::-webkit-scrollbar-thumb { background: var(--border); }
 
 .event-item {
-  padding: 10px 10px; border: 1px solid var(--border); margin-bottom: 5px;
-  cursor: pointer; transition: border-color .15s, background .15s;
+  padding: 9px 10px; border: 1px solid var(--border);
+  margin-bottom: 4px; cursor: pointer;
+  transition: border-color .15s, background .15s;
 }
-.event-item:hover { border-color: var(--border-2); background: var(--surface-2); }
+.event-item:hover  { border-color: var(--border-2); background: var(--surface-2); }
 .event-item.active { border-color: var(--amber-dim); background: var(--amber-bg); }
-.ei-name { font-size: .75rem; font-weight: 500; color: var(--text); margin-bottom: 4px;
-           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ei-meta { display: flex; justify-content: space-between; align-items: center; }
-.ei-id { font-size: .55rem; color: var(--muted); }
+.ei-name { font-size: .74rem; font-weight: 500; color: var(--text);
+           margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ei-row  { display: flex; justify-content: space-between; align-items: center; }
+.ei-id   { font-size: .52rem; color: var(--muted); }
 
-.pill { font-size: .5rem; letter-spacing: .12em; padding: 2px 7px;
+.pill { font-size: .48rem; letter-spacing: .12em; padding: 2px 6px;
         text-transform: uppercase; border: 1px solid; }
-.pill.open    { color: var(--amber); border-color: var(--amber-dim); }
+.pill.open    { color: var(--amber);  border-color: var(--amber-dim); }
 .pill.pending { color: var(--muted-2); border-color: var(--border-2); }
-.pill.closed  { color: var(--muted); border-color: var(--border); }
+.pill.closed  { color: var(--muted);  border-color: var(--border); }
 
-.empty-state { font-size: .65rem; color: var(--muted); text-align: center; padding: 18px 0; }
+.empty-state { font-size: .62rem; color: var(--muted); padding: 14px 0; letter-spacing: .1em; }
 
-/* ─── Main Panel ─────────────────────────────────────────────────── */
-.main { display: flex; flex-direction: column; overflow: hidden; }
+/* ── Step 2 internals ────────────────────────────────────────── */
+.s2-body { flex: 1; display: flex; flex-direction: column; padding: 16px 20px; }
 
-/* 頂部：活動標題 + 操作按鈕 — 主控制列集中在一行 */
-.main-head {
-  padding: 14px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-  display: flex; align-items: center; gap: 12px;
-}
-.main-title { font-family: 'Cormorant SC', serif; font-size: 1.2rem;
-              font-weight: 600; letter-spacing: .06em; color: var(--text); flex: 1;
-              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.main-sub { font-size: .55rem; color: var(--muted); letter-spacing: .1em; }
+.empty-panel { flex: 1; display: flex; align-items: center; justify-content: center;
+               font-size: .64rem; color: var(--muted); letter-spacing: .12em; }
 
-.ctrl-row { display: flex; gap: 6px; flex-shrink: 0; }
+.ev-title { font-family: 'Cormorant SC', serif; font-size: 1.1rem;
+            font-weight: 600; letter-spacing: .06em; color: var(--text);
+            margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-meta  { font-size: .52rem; color: var(--muted); letter-spacing: .1em; margin-bottom: 16px; }
+
+/* Open / Close controls */
+.ctrl-row { display: flex; gap: 6px; margin-bottom: 16px; }
 .btn-ctrl {
-  padding: 7px 14px; font-family: 'IBM Plex Mono', monospace;
-  font-size: .6rem; letter-spacing: .12em; text-transform: uppercase;
-  border: 1px solid; cursor: pointer; transition: background .15s, box-shadow .15s;
-  background: transparent; white-space: nowrap;
+  flex: 1; padding: 8px;
+  font-family: 'IBM Plex Mono', monospace; font-size: .58rem;
+  letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid; cursor: pointer;
+  transition: background .15s, box-shadow .15s; background: transparent;
 }
 .btn-ctrl.open-btn  { border-color: var(--amber-dim); color: var(--amber); }
 .btn-ctrl.open-btn:hover  { background: var(--amber-bg); box-shadow: 0 0 10px rgba(245,158,11,.2); }
@@ -153,215 +217,242 @@ body::after {
 .btn-ctrl.close-btn:hover { background: var(--surface-3); }
 .btn-ctrl:disabled { opacity: .3; cursor: not-allowed; }
 
-/* Stats — 緊湊橫排 */
-.stats { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.stat { flex: 1; padding: 12px 16px; text-align: center;
-        border-right: 1px solid var(--border); }
-.stat:last-child { border-right: none; }
-.stat-n { font-family: 'Bebas Neue', sans-serif; font-size: 1.9rem;
-          line-height: 1; color: var(--amber); }
+/* Stats grid */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat {
+  padding: 10px 12px; background: var(--surface);
+  border: 1px solid var(--border); text-align: center;
+}
+.stat-n { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; line-height: 1; color: var(--amber); }
 .stat-n.green { color: var(--green); }
 .stat-n.dim   { color: var(--muted); }
-.stat-l { font-size: .5rem; letter-spacing: .2em; color: var(--muted);
-          text-transform: uppercase; margin-top: 2px; }
+.stat-l { font-size: .46rem; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
 
-/* 放行列 — 主要快速操作，視覺突出 */
+/* ── Step 3 internals ────────────────────────────────────────── */
+.s3-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Admit controls bar */
 .admit-bar {
-  padding: 10px 24px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.admit-bar label { font-size: .56rem; letter-spacing: .18em; color: var(--muted);
-                   text-transform: uppercase; white-space: nowrap; }
-.admit-bar input {
-  width: 68px; background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: .8rem;
-  padding: 6px 9px; outline: none; text-align: center; transition: border-color .2s;
-}
-.admit-bar input:focus { border-color: var(--amber-dim); }
-/* 快速放行按鈕組 */
+.admit-lbl { font-size: .5rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
 .preset-btns { display: flex; gap: 4px; }
 .btn-preset {
-  padding: 5px 9px; background: var(--surface-3); border: 1px solid var(--border-2);
-  color: var(--muted-2); font-family: 'IBM Plex Mono', monospace; font-size: .58rem;
-  letter-spacing: .08em; cursor: pointer; transition: border-color .15s, color .15s;
+  padding: 5px 8px; background: var(--surface-3);
+  border: 1px solid var(--border-2); color: var(--muted-2);
+  font-family: 'IBM Plex Mono', monospace; font-size: .54rem;
+  letter-spacing: .06em; cursor: pointer; transition: border-color .15s, color .15s;
 }
 .btn-preset:hover { border-color: var(--amber-dim); color: var(--amber); }
-
+.admit-input {
+  width: 60px; background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: .78rem;
+  padding: 5px 8px; outline: none; text-align: center; transition: border-color .2s;
+}
+.admit-input:focus { border-color: var(--amber-dim); }
 .btn-admit {
-  padding: 7px 20px; background: var(--amber); border: none; color: var(--bg);
-  font-family: 'IBM Plex Mono', monospace; font-size: .68rem; font-weight: 500;
-  letter-spacing: .15em; text-transform: uppercase; cursor: pointer;
+  padding: 6px 18px; background: var(--amber); border: none; color: var(--bg);
+  font-family: 'IBM Plex Mono', monospace; font-size: .65rem; font-weight: 500;
+  letter-spacing: .16em; text-transform: uppercase; cursor: pointer;
   transition: background .2s, box-shadow .2s; white-space: nowrap;
 }
 .btn-admit:hover { background: #FBBA2A; box-shadow: 0 0 12px rgba(245,158,11,.35); }
-
 .admit-spacer { flex: 1; }
-.ws-badge { font-size: .58rem; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
-.ws-badge.live { color: var(--green); }
 .btn-refresh {
-  padding: 6px 12px; background: transparent; border: 1px solid var(--border);
-  color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: .58rem;
-  letter-spacing: .1em; cursor: pointer; transition: border-color .15s, color .15s;
-  white-space: nowrap;
+  padding: 5px 10px; background: transparent; border: 1px solid var(--border);
+  color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: .54rem;
+  cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap;
 }
-.btn-refresh:hover { border-color: var(--border-2); color: var(--muted-2); }
+.btn-refresh:hover { color: var(--muted-2); border-color: var(--border-2); }
 
-/* Table */
+/* Queue table */
 .table-wrap {
   flex: 1; overflow-y: auto;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent;
 }
-.table-wrap::-webkit-scrollbar { width: 4px; }
+.table-wrap::-webkit-scrollbar { width: 3px; }
 .table-wrap::-webkit-scrollbar-thumb { background: var(--border); }
 
 table { width: 100%; border-collapse: collapse; }
 thead th {
-  position: sticky; top: 0; background: var(--surface); z-index: 10;
-  padding: 9px 14px; text-align: left;
-  font-size: .52rem; letter-spacing: .22em; color: var(--muted);
+  position: sticky; top: 0; background: var(--surface); z-index: 5;
+  padding: 8px 14px; text-align: left;
+  font-size: .48rem; letter-spacing: .22em; color: var(--muted);
   text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 400;
 }
 tbody tr { border-bottom: 1px solid rgba(37,34,32,.6); transition: background .1s; }
 tbody tr:hover { background: var(--surface-2); }
-tbody tr.dim { opacity: .38; }
-td { padding: 9px 14px; font-size: .7rem; letter-spacing: .03em; }
-
-.rank-cell { color: var(--gold); font-weight: 500; width: 44px; }
-.user-cell { color: var(--text); max-width: 200px; overflow: hidden;
+tbody tr.dim { opacity: .35; }
+td { padding: 8px 14px; font-size: .68rem; letter-spacing: .03em; }
+.rank-cell { color: var(--gold); font-weight: 500; width: 40px; }
+.user-cell { color: var(--text); max-width: 220px; overflow: hidden;
              text-overflow: ellipsis; white-space: nowrap; }
-.time-cell { color: var(--muted-2); font-size: .62rem; }
-
-.tag { display: inline-block; padding: 2px 8px; font-size: .52rem;
+.time-cell { color: var(--muted-2); font-size: .6rem; }
+.tag { display: inline-block; padding: 2px 7px; font-size: .5rem;
        letter-spacing: .14em; text-transform: uppercase; border: 1px solid; }
 .tag.waiting  { color: var(--amber); border-color: var(--amber-dim); }
 .tag.admitted { color: var(--green); border-color: rgba(16,185,129,.3); }
 .tag.expired  { color: var(--muted-2); border-color: var(--border-2); }
 .tag.cancelled{ color: var(--muted); border-color: var(--border); }
 
-.empty-main {
-  flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 10px; color: var(--muted);
-}
-.empty-icon { font-size: 1.8rem; color: var(--border-2); }
-.empty-main p { font-size: .68rem; letter-spacing: .15em; }
-
 /* Toasts */
-.toasts { position: fixed; top: 16px; right: 16px; z-index: 1000;
+.toasts { position: fixed; top: 14px; right: 14px; z-index: 1000;
           display: flex; flex-direction: column; gap: 6px; }
 .toast {
-  padding: 10px 16px; background: var(--surface-2);
-  border-left: 3px solid var(--amber); font-size: .68rem; letter-spacing: .04em;
-  max-width: 300px; animation: tIn .2s ease, tOut .3s ease 2.7s forwards;
+  padding: 9px 15px; background: var(--surface-2);
+  border-left: 3px solid var(--amber); font-size: .65rem; letter-spacing: .04em;
+  max-width: 280px; animation: tIn .2s ease, tOut .3s ease 2.7s forwards;
 }
 .toast.err { border-left-color: var(--red); }
 .toast.ok  { border-left-color: var(--green); }
-@keyframes tIn  { from { opacity:0; transform: translateX(10px); } }
+@keyframes tIn  { from { opacity:0; transform:translateX(10px); } }
 @keyframes tOut { to   { opacity:0; } }
 </style>
 </head>
 <body>
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo">Queue<em>Flow</em></div>
+    <div class="admin-chip">Admin</div>
+  </div>
+  <div class="ws-pill">
+    <div class="ws-dot" id="wsDot"></div>
+    <span class="ws-label" id="wsLabel">未連線</span>
+  </div>
+</header>
+
 <div class="layout">
 
-  <!-- ── Sidebar ──────────────────────────────────────────────────── -->
-  <aside class="sidebar">
-    <div class="sidebar-head">
-      <div class="logo">Queue<em>Flow</em></div>
-      <div class="admin-chip">Admin</div>
-    </div>
+  <!-- ══ STEP 01：建立 / 選取活動（奇數：數字上，提示下）══ -->
+  <div class="step step-a">
+    <div class="step-num">01</div>
+    <div class="step-tag">建立活動</div>
 
-    <!-- 建立活動：預設折疊，需要時展開 -->
-    <button class="create-toggle" id="createToggle" onclick="toggleCreate()">
-      <span>＋ 建立活動</span>
-      <span class="arrow">▶</span>
-    </button>
-    <div class="create-form" id="createForm">
-      <div class="create-form-inner">
-        <div class="field">
-          <label>活動名稱</label>
-          <input id="fName" type="text" placeholder="演唱會 2026">
+    <div class="step-body">
+      <div class="s1-body">
+
+        <!-- 建立表單（可折疊） -->
+        <button class="create-toggle" id="createToggle" onclick="toggleCreate()">
+          <span>＋ 新活動</span><span class="arrow">▶</span>
+        </button>
+        <div class="create-form" id="createForm">
+          <div class="create-form-inner">
+            <div class="field">
+              <label>活動名稱</label>
+              <input id="fName" type="text" placeholder="演唱會 2026">
+            </div>
+            <div class="field">
+              <label>容量（人）</label>
+              <input id="fCap" type="number" placeholder="1000" min="1">
+            </div>
+            <div class="field">
+              <label>開始（選填）</label>
+              <input id="fOpen" type="datetime-local">
+            </div>
+            <div class="field">
+              <label>結束（選填）</label>
+              <input id="fClose" type="datetime-local">
+            </div>
+            <button type="button" class="btn-create" onclick="createEvent()">建立</button>
+          </div>
         </div>
-        <div class="field">
-          <label>容量（人）</label>
-          <input id="fCap" type="number" placeholder="1000" min="1">
+
+        <!-- 活動列表 -->
+        <div class="ev-list-head">活動列表</div>
+        <div class="ev-list" id="eventList">
+          <div class="empty-state">尚無活動</div>
         </div>
-        <div class="field">
-          <label>開始（選填）</label>
-          <input id="fOpen" type="datetime-local">
-        </div>
-        <div class="field">
-          <label>結束（選填）</label>
-          <input id="fClose" type="datetime-local">
-        </div>
-        <button type="button" class="btn-create" onclick="createEvent()">建立</button>
       </div>
     </div>
 
-    <div class="ev-list-head">活動列表</div>
-    <div class="ev-list" id="eventList"><div class="empty-state">尚無活動</div></div>
-  </aside>
-
-  <!-- ── Main Panel ─────────────────────────────────────────────── -->
-  <div class="main" id="mainPanel">
-
-    <!-- 主控制列：標題 + 開放/關閉 — 所有主要操作集中在上方一行 -->
-    <div class="main-head">
-      <div style="flex:1;min-width:0">
-        <div class="main-title" id="mainTitle">選擇一個活動</div>
-        <div class="main-sub" id="mainSub">—</div>
-      </div>
-      <div class="ctrl-row" id="ctrlRow" style="display:none">
-        <button class="btn-ctrl open-btn"  id="btnOpen"  onclick="openEvent()">開放候補</button>
-        <button class="btn-ctrl close-btn" id="btnClose" onclick="closeEvent()">關閉候補</button>
-      </div>
+    <div class="step-hint">
+      建立新活動或從列表中選取<br>
+      點擊活動項目進入管理
     </div>
-
-    <!-- Stats -->
-    <div class="stats" id="statsRow" style="display:none">
-      <div class="stat"><div class="stat-n" id="sWait">0</div><div class="stat-l">等待中</div></div>
-      <div class="stat"><div class="stat-n green" id="sAdmt">0</div><div class="stat-l">已放行</div></div>
-      <div class="stat"><div class="stat-n dim" id="sOther">0</div><div class="stat-l">取消/逾時</div></div>
-      <div class="stat"><div class="stat-n dim" id="sTotal">0</div><div class="stat-l">總計</div></div>
-    </div>
-
-    <!-- 放行列：快捷按鈕 + 自訂數量 -->
-    <div class="admit-bar" id="admitBar" style="display:none">
-      <label>放行</label>
-      <!-- 快速預設數量 -->
-      <div class="preset-btns">
-        <button class="btn-preset" onclick="setAdmit(5)">×5</button>
-        <button class="btn-preset" onclick="setAdmit(10)">×10</button>
-        <button class="btn-preset" onclick="setAdmit(50)">×50</button>
-      </div>
-      <input id="admitN" type="number" value="10" min="1">
-      <button class="btn-admit" onclick="admitQueue()">放行</button>
-      <div class="admit-spacer"></div>
-      <button class="btn-refresh" onclick="loadQueue()">重新整理</button>
-      <div class="ws-badge" id="wsBadge">未連線</div>
-    </div>
-
-    <!-- Table -->
-    <div class="table-wrap" id="tableWrap" style="display:none">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>使用者 ID</th>
-            <th>加入時間</th>
-            <th>狀態</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
-
-    <!-- 空狀態 -->
-    <div class="empty-main" id="emptyMain">
-      <div class="empty-icon">◈</div>
-      <p>請從左側選擇活動</p>
-    </div>
-
   </div>
+
+  <!-- ══ STEP 02：活動管理（偶數：提示上，數字下）══ -->
+  <div class="step step-b">
+    <div class="step-hint">選取活動後開放候補，即時查看等待人數與統計</div>
+
+    <div class="step-body">
+      <div class="s2-body">
+        <!-- 未選取時的佔位 -->
+        <div class="empty-panel" id="s2Empty">← 請先選取活動</div>
+
+        <!-- 選取後顯示 -->
+        <div id="s2Content" style="display:none;flex:1;display:none;flex-direction:column">
+          <div class="ev-title" id="evTitle">—</div>
+          <div class="ev-meta"  id="evMeta">—</div>
+          <div class="ctrl-row">
+            <button class="btn-ctrl open-btn"  id="btnOpen"  onclick="openEvent()">開放候補</button>
+            <button class="btn-ctrl close-btn" id="btnClose" onclick="closeEvent()">關閉候補</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="stat-n" id="sWait">0</div><div class="stat-l">等待中</div></div>
+            <div class="stat"><div class="stat-n green" id="sAdmt">0</div><div class="stat-l">已放行</div></div>
+            <div class="stat"><div class="stat-n dim" id="sOther">0</div><div class="stat-l">取消/逾時</div></div>
+            <div class="stat"><div class="stat-n dim" id="sTotal">0</div><div class="stat-l">總計</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-tag">活動管理</div>
+    <div class="step-num">02</div>
+  </div>
+
+  <!-- ══ STEP 03：放行操作（奇數：數字上，提示下）══ -->
+  <div class="step step-a">
+    <div class="step-num">03</div>
+    <div class="step-tag">放行操作</div>
+
+    <div class="step-body">
+      <div class="s3-body">
+        <!-- 放行控制列 -->
+        <div class="admit-bar" id="admitBar" style="display:none">
+          <span class="admit-lbl">放行</span>
+          <div class="preset-btns">
+            <button class="btn-preset" onclick="setAdmit(5)">×5</button>
+            <button class="btn-preset" onclick="setAdmit(10)">×10</button>
+            <button class="btn-preset" onclick="setAdmit(50)">×50</button>
+          </div>
+          <input class="admit-input" id="admitN" type="number" value="10" min="1">
+          <button class="btn-admit" onclick="admitQueue()">放行</button>
+          <div class="admit-spacer"></div>
+          <button class="btn-refresh" onclick="loadQueue()">重整</button>
+        </div>
+
+        <!-- 隊列表格 -->
+        <div class="table-wrap" id="tableWrap" style="display:none">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>使用者 ID</th>
+                <th>加入時間</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- 未選取佔位 -->
+        <div id="s3Empty" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--muted);letter-spacing:.12em">
+          ← 請先選取並開放活動
+        </div>
+      </div>
+    </div>
+
+    <div class="step-hint">
+      設定放行數量後按放行<br>
+      Enter 快速送出 · 系統即時推播通知
+    </div>
+  </div>
+
 </div>
 
 <div class="toasts" id="toasts"></div>
@@ -369,19 +460,17 @@ td { padding: 9px 14px; font-size: .7rem; letter-spacing: .03em; }
 <script>
 const A = { events: [], selId: null, selStatus: null, stomp: null };
 
-/* ── 建立活動折疊 ── */
+/* ── 建立表單折疊 ── */
 function toggleCreate() {
-  const toggle = document.getElementById('createToggle');
-  const form   = document.getElementById('createForm');
-  toggle.classList.toggle('open');
-  form.classList.toggle('open');
+  document.getElementById('createToggle').classList.toggle('open');
+  document.getElementById('createForm').classList.toggle('open');
 }
 
 /* ── 建立活動 ── */
 async function createEvent() {
   const name     = document.getElementById('fName').value.trim();
   const capacity = parseInt(document.getElementById('fCap').value);
-  if (!name) { toast('請輸入活動名稱', 'err'); return; }
+  if (!name)              { toast('請輸入活動名稱', 'err'); return; }
   if (!capacity || capacity < 1) { toast('請輸入有效容量', 'err'); return; }
 
   const openRaw  = document.getElementById('fOpen').value;
@@ -395,9 +484,7 @@ async function createEvent() {
     A.events.unshift(r.data);
     renderList();
     toast(`活動「${r.data.name}」建立成功`, 'ok');
-    // 清空欄位
     ['fName','fCap','fOpen','fClose'].forEach(id => document.getElementById(id).value = '');
-    // 自動收起並跳轉到新活動
     document.getElementById('createToggle').classList.remove('open');
     document.getElementById('createForm').classList.remove('open');
     selectEvent(r.data.id);
@@ -409,7 +496,7 @@ async function createEvent() {
 /* ── 開放 / 關閉 ── */
 async function openEvent() {
   const r = await req(`/api/admin/events/${A.selId}/open`, 'POST');
-  if (r.success) { patchStatus('OPEN'); toast('活動已開放候補', 'ok'); }
+  if (r.success) { patchStatus('OPEN');   toast('活動已開放候補', 'ok'); }
   else toast(r.message || '失敗', 'err');
 }
 async function closeEvent() {
@@ -435,28 +522,30 @@ async function admitQueue() {
   else toast(r.message || '放行失敗', 'err');
 }
 
-// Enter 快捷放行
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.activeElement === document.getElementById('admitN')) {
-    admitQueue();
-  }
+  if (e.key === 'Enter' && document.activeElement === document.getElementById('admitN')) admitQueue();
 });
 
-/* ── 選擇活動 ── */
+/* ── 選取活動 ── */
 async function selectEvent(id) {
   A.selId = id;
   const ev = A.events.find(e => e.id === id);
   A.selStatus = ev?.status;
 
-  document.getElementById('mainTitle').textContent = ev?.name || '—';
-  document.getElementById('mainSub').textContent   = `ID: ${id}  ·  容量: ${ev?.capacity ?? '—'}`;
-  document.getElementById('emptyMain').style.display = 'none';
-  document.getElementById('statsRow').style.display  = 'flex';
+  // Step 2: show content
+  document.getElementById('s2Empty').style.display   = 'none';
+  const s2c = document.getElementById('s2Content');
+  s2c.style.display = 'flex'; s2c.style.flexDirection = 'column'; s2c.style.flex = '1';
+  document.getElementById('evTitle').textContent = ev?.name || '—';
+  document.getElementById('evMeta').textContent  = `ID: ${id}  ·  容量: ${ev?.capacity ?? '—'}`;
+  renderCtrls();
+
+  // Step 3: show controls
+  document.getElementById('s3Empty').style.display   = 'none';
   document.getElementById('admitBar').style.display  = 'flex';
   document.getElementById('tableWrap').style.display = 'block';
-  document.getElementById('ctrlRow').style.display   = 'flex';
 
-  renderCtrls(); renderList();
+  renderList();
   await loadQueue();
   connectWs(id);
 }
@@ -479,7 +568,7 @@ function renderList() {
   el.innerHTML = A.events.map(ev => `
     <div class="event-item ${ev.id === A.selId ? 'active' : ''}" onclick="selectEvent(${ev.id})">
       <div class="ei-name">${esc(ev.name)}</div>
-      <div class="ei-meta">
+      <div class="ei-row">
         <span class="ei-id">ID: ${ev.id}</span>
         <span class="pill ${cls[ev.status]||'pending'}">${lbl[ev.status]||ev.status}</span>
       </div>
@@ -524,7 +613,7 @@ function renderTable(entries) {
 function fmtTime(v) {
   if (!v) return '—';
   if (Array.isArray(v)) { const [,,,h,m,s=0] = v; return `${pad(h)}:${pad(m)}:${pad(s)}`; }
-  try { const d = new Date(v); return d.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  try { return new Date(v).toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
   catch(_) { return v; }
 }
 function fmtSort(v) {
@@ -541,26 +630,27 @@ function connectWs(eventId) {
     webSocketFactory: () => new SockJS('/ws'),
     reconnectDelay: 5000,
     onConnect: () => {
-      document.getElementById('wsBadge').textContent = '● 即時';
-      document.getElementById('wsBadge').className   = 'ws-badge live';
+      document.getElementById('wsLabel').textContent = '● 即時';
+      document.getElementById('wsLabel').className   = 'ws-label live';
+      document.getElementById('wsDot').className     = 'ws-dot live';
       client.subscribe(`/topic/events/${eventId}/queue`, async () => {
         if (A.selId === eventId) await loadQueue();
       });
     },
     onDisconnect: () => {
-      document.getElementById('wsBadge').textContent = '已斷線';
-      document.getElementById('wsBadge').className   = 'ws-badge';
+      document.getElementById('wsLabel').textContent = '已斷線';
+      document.getElementById('wsLabel').className   = 'ws-label';
+      document.getElementById('wsDot').className     = 'ws-dot';
     },
   });
   client.activate();
   A.stomp = client;
 }
 
-/* ── 啟動時載入活動列表 ── */
+/* ── Bootstrap: 啟動載入活動列表 ── */
 (async function bootstrap() {
   const r = await req('/api/admin/events');
   if (r.success && r.data.length) {
-    // 依 id 降冪排列，最新的排前面
     A.events = r.data.sort((a, b) => b.id - a.id);
     renderList();
   }
