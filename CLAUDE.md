@@ -6,8 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 QueueFlow 是一套以 Java 21 + Spring Boot 建置的高併發線上候補排隊系統，目標支援演唱會、限量商品、餐廳候位等流量集中湧入場景。**第一階段為單體架構**，第二階段預留 Kafka 事件化擴充空間。
 
-> **專案狀態**：目前為 greenfield 起始狀態，尚未建立 `src/` 目錄；CLAUDE.md 反映完整的設計規格，作為實作依據。
-
 ## 技術棧
 
 - **語言/框架：** Java 21、Spring Boot、Spring Web、Spring Data JPA、Spring WebSocket
@@ -31,19 +29,25 @@ docker-compose up -d
 
 ## 常用指令
 
+Java 21 在 macOS 上由 Homebrew 安裝為 keg-only，執行指令須帶 `JAVA_HOME`：
+
 ```bash
 # 建置（跳過測試）
-mvn clean package -DskipTests
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" mvn clean package -DskipTests
 
 # 執行測試
-mvn test
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" mvn test
 
 # 執行單一測試類別
-mvn test -Dtest=QueueServiceTest
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" mvn test -Dtest=QueueServiceTest
 
 # 啟動應用（需先啟動 Docker 依賴）
-mvn spring-boot:run
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" mvn spring-boot:run
 ```
+
+啟動後前端頁面：
+- 使用者：`http://localhost:8080/index.html`
+- 管理後台：`http://localhost:8080/admin.html`
 
 ## 套件結構
 
@@ -52,10 +56,10 @@ com.example.queueflow
 ├─ api            # Controller，對外 REST 入口
 ├─ application    # 用例服務（QueueService、EventService）
 ├─ domain         # 核心業務模型（QueueEntry、QueueEvent）及狀態常數
-├─ infrastructure # JPA Repository、Redis 操作、排程
+├─ infrastructure # JPA Repository、RedisQueueStore
 ├─ realtime       # WebSocket 推播配置與訊息發送
 ├─ batch          # 逾時失效定時任務
-└─ common         # 統一回應格式、例外處理
+└─ common         # 統一回應格式（ApiResponse）、例外處理
 ```
 
 ## 核心資料模型
@@ -72,7 +76,7 @@ com.example.queueflow
 
 ```
 WAITING → ADMITTED（管理員放行）
-WAITING → EXPIRED（逾時未處理）
+WAITING → EXPIRED（活動關閉後由排程清除）
 WAITING → CANCELLED（使用者主動取消）
 ```
 
@@ -80,37 +84,46 @@ WAITING → CANCELLED（使用者主動取消）
 
 | Key | 用途 |
 |-----|------|
-| `queue:{eventId}` | Sorted Set，儲存排隊順序 |
+| `queue:{eventId}` | Sorted Set，score = 原子序列，儲存排隊順序 |
+| `queue:seq:{eventId}` | INCR 原子序列，保證同毫秒並發加入時 FIFO 順序 |
 | `queue:user:{eventId}:{userId}` | 防止重複加入 |
-| `ratelimit:join:{userId}` | 限流 |
+| `ratelimit:join:{userId}` | 限流（SET NX EX 5s） |
 | `admit:lock:{eventId}` | 放行分散式鎖 |
 
 ## API 設計
 
 ### 使用者端
-- `POST /api/events/{eventId}/queue/join` — 加入候補
-- `GET /api/events/{eventId}/queue/me` — 查詢順位
-- `DELETE /api/events/{eventId}/queue/me` — 取消候補
+- `POST /api/events/{eventId}/queue/join?userId=` — 加入候補
+- `GET /api/events/{eventId}/queue/me?userId=` — 查詢順位
+- `DELETE /api/events/{eventId}/queue/me?userId=` — 取消候補
 
 ### 管理端
 - `POST /api/admin/events` — 建立活動
 - `POST /api/admin/events/{eventId}/open` — 開啟候補
 - `POST /api/admin/events/{eventId}/close` — 關閉候補
-- `POST /api/admin/events/{eventId}/admit` — 分批放行
+- `POST /api/admin/events/{eventId}/admit` — 分批放行（body: `{"count": N}`，N 必須 > 0）
 - `GET /api/admin/events/{eventId}/queue` — 查詢清單
 
 ## WebSocket 主題
 
-- `/topic/events/{eventId}/queue` — 全局順位更新
-- `/topic/users/{userId}/queue-status` — 個人狀態通知（放行、逾時）
+- `/topic/events/{eventId}/queue` — 全局順位更新（payload: `{queueSize}`）
+- `/topic/users/{userId}/queue-status` — 個人狀態通知（payload: `{status}`）
 
 ## 高併發關鍵設計
 
 1. **Redis 作為主排隊結構**：用 Sorted Set 維護順序，避免直接打 DB。
-2. **防重複入列**：`queue:user:{eventId}:{userId}` 設值後才寫入排隊結構，兩步需原子化。
-3. **分散式鎖放行**：`admit:lock:{eventId}` 防止管理端重複放行同一批次。
-4. **限流保護**：`ratelimit:join:{userId}` 限制短時間內重複請求。
-5. **DB 寫入時序**：Redis 入列成功後再非同步寫入 PostgreSQL，降低延遲。
+2. **FIFO 保證**：以 `INCR queue:seq:{eventId}` 取原子遞增值作為 score，而非 `currentTimeMillis`，防止同毫秒並發加入時的字典序亂序。
+3. **防重複入列**：Lua script 原子執行「檢查 user key → SETEX → ZADD」，確保不重複入列。
+4. **分散式鎖放行**：`admit:lock:{eventId}` 防止管理端重複放行同一批次。
+5. **限流保護**：`ratelimit:join:{userId}` 用 SET NX EX 限制短時間內重複請求。
+6. **逾時語意**：排程只清除**活動已關閉（CLOSED）**後殘留的 WAITING 記錄，不影響正在等候的使用者。
+
+## 重要實作細節
+
+- **`QueueService.joinQueue`** 使用 `@Transactional` 同步寫入 DB，確保後續 cancel/admit 能立即查到記錄（Phase 2 可改為 Kafka 事件驅動非同步寫入）。
+- **多次入列查詢**：取消或放行後 Redis user key 被刪除，同一使用者可再次入列。Repository 使用 `findByEventIdAndUserIdAndStatus(..., WAITING)` 而非通用查詢，避免多筆記錄時拋出 non-unique-result exception。
+- **`/me` 歷史查詢**：Redis 無記錄時改用 `findFirstByEventIdAndUserIdOrderByJoinedAtDesc` 回傳最新終態。
+- **Jackson**：設定 `write-dates-as-timestamps=false`，`LocalDateTime` 序列化為 ISO 8601 字串，前端直接用 `new Date(str)` 解析。
 
 ## 第二階段擴充（預留）
 
