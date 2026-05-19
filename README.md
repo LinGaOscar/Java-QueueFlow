@@ -47,22 +47,36 @@
 
 ---
 
-## 快速啟動
+## 啟動順序
 
-### 1. 啟動依賴服務
+> **PostgreSQL 與 Redis 必須在 Java 應用之前啟動。**
+> Spring Boot 啟動時會立即連線 DB（執行 `schema.sql` 建表）與 Redis（初始化連線池），任一服務未就緒都會導致啟動失敗。
+
+### Step 1 — 啟動依賴服務
+
+**同時啟動（根目錄）：**
 
 ```bash
 docker compose up -d
 ```
 
-啟動後：PostgreSQL 監聽 `5432`，Redis 監聽 `6379`。
+**或分開啟動：**
 
 ```bash
-# 確認容器狀態
-docker compose ps
+docker compose -f docker/postgres/docker-compose.yml up -d
+docker compose -f docker/redis/docker-compose.yml up -d
 ```
 
-### 2. 建置並啟動應用
+確認兩個容器均為 `Up` 狀態再進行下一步：
+
+```bash
+docker compose ps
+# NAME                 STATUS
+# queueflow-postgres   Up
+# queueflow-redis      Up
+```
+
+### Step 2 — 啟動 Java 應用
 
 macOS（Homebrew 安裝 Java 21 為 keg-only）：
 
@@ -78,7 +92,9 @@ Linux / 已設定 `JAVA_HOME` 的環境：
 mvn spring-boot:run
 ```
 
-### 3. 開啟頁面
+看到 `Started QueueFlowApplication` 表示啟動成功。
+
+### Step 3 — 開啟頁面
 
 | 頁面 | URL |
 |------|-----|
@@ -89,29 +105,20 @@ mvn spring-boot:run
 
 ## Docker 設定說明
 
-```yaml
-# docker-compose.yml
-services:
-  postgres:
-    image: postgres:16
-    container_name: queueflow-postgres
-    environment:
-      POSTGRES_DB:       queueflow
-      POSTGRES_USER:     queueflow
-      POSTGRES_PASSWORD: queueflow
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data   # 資料持久化
+提供三個 compose 檔案，依需求擇一使用：
 
-  redis:
-    image: redis:7
-    container_name: queueflow-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data                         # AOF/RDB 持久化
-```
+| 檔案 | 用途 |
+|------|------|
+| `docker-compose.yml` | 同時啟動 PostgreSQL + Redis |
+| `docker/postgres/docker-compose.yml` | 僅啟動 PostgreSQL |
+| `docker/redis/docker-compose.yml` | 僅啟動 Redis |
+
+連線資訊：
+
+| 服務 | 主機:埠 | 帳號 / 密碼 / DB |
+|------|---------|-----------------|
+| PostgreSQL | localhost:5432 | queueflow / queueflow / queueflow |
+| Redis | localhost:6379 | 無密碼 |
 
 資料表結構由 `src/main/resources/schema.sql` 在應用啟動時自動建立（`CREATE TABLE IF NOT EXISTS`），不需手動執行 SQL。
 
