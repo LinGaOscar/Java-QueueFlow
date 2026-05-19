@@ -351,7 +351,7 @@ td { padding: 8px 14px; font-size: .68rem; letter-spacing: .03em; }
               <label>結束（選填）</label>
               <input id="fClose" type="datetime-local">
             </div>
-            <button type="button" class="btn-create" onclick="createEvent()">建立</button>
+            <button type="button" class="btn-create" onclick="submitNewEvent()">建立</button>
           </div>
         </div>
 
@@ -463,7 +463,7 @@ function toggleCreate() {
 }
 
 /* ── 建立活動 ── */
-async function createEvent() {
+async function submitNewEvent() {
   const name     = document.getElementById('fName').value.trim();
   const capacity = parseInt(document.getElementById('fCap').value);
   if (!name)              { toast('請輸入活動名稱', 'err'); return; }
