@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QueueFlow — 管理後台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=Cormorant+SC:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #070706;
+  --surface:   #0E0D0C;
+  --surface-2: #161412;
+  --surface-3: #1E1B18;
+  --border:    #252220;
+  --border-2:  #302C28;
+  --amber:     #F59E0B;
+  --amber-dim: rgba(245,158,11,.28);
+  --amber-bg:  rgba(245,158,11,.06);
+  --gold:      #C9963A;
+  --text:      #EDE7DB;
+  --muted:     #695F54;
+  --muted-2:   #9A8E80;
+  --green:     #10B981;
+  --red:       #EF4444;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text);
+             font-family: 'IBM Plex Mono', monospace; overflow: hidden; }
+
+/* noise */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 900;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+}
+
+/* ─── Layout ────────────────────────────────────────────────────── */
+.layout { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+
+/* ─── Sidebar ───────────────────────────────────────────────────── */
+.sidebar {
+  border-right: 1px solid var(--border); overflow-y: auto;
+  display: flex; flex-direction: column;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+.sidebar-head {
+  padding: 18px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.logo { font-family: 'Cormorant SC', serif; font-size: 1rem;
+        font-weight: 600; letter-spacing: .3em; color: var(--amber); }
+.logo em { color: var(--muted); font-style: normal; }
+.admin-chip {
+  font-size: .5rem; letter-spacing: .2em; padding: 3px 8px;
+  border: 1px solid var(--amber-dim); color: var(--gold); text-transform: uppercase;
+}
+
+.section { border-bottom: 1px solid var(--border); padding: 16px 20px; }
+.section-title { font-size: .55rem; letter-spacing: .3em; color: var(--muted);
+                 text-transform: uppercase; margin-bottom: 14px; }
+
+/* Form */
+.field { margin-bottom: 10px; }
+.field label { display: block; font-size: .58rem; letter-spacing: .15em;
+               color: var(--muted-2); margin-bottom: 4px; text-transform: uppercase; }
+.field input {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: .75rem;
+  padding: 7px 10px; outline: none; transition: border-color .2s;
+}
+.field input:focus { border-color: var(--amber-dim); }
+
+.btn-create {
+  width: 100%; margin-top: 6px; padding: 10px;
+  background: var(--amber); border: none; color: var(--bg);
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem;
+  font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
+  cursor: pointer; transition: background .2s, box-shadow .2s;
+}
+.btn-create:hover { background: #FBBA2A; box-shadow: 0 0 16px rgba(245,158,11,.35); }
+
+/* Event list */
+.event-item {
+  padding: 12px 14px; border: 1px solid var(--border); margin-bottom: 6px;
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.event-item:hover { border-color: var(--border-2); background: var(--surface-2); }
+.event-item.active { border-color: var(--amber-dim); background: var(--amber-bg); }
+
+.ei-name { font-size: .8rem; font-weight: 500; letter-spacing: .04em;
+           color: var(--text); margin-bottom: 5px; }
+.ei-meta { display: flex; justify-content: space-between; align-items: center; }
+.ei-id { font-size: .58rem; color: var(--muted); letter-spacing: .1em; }
+
+.pill { font-size: .52rem; letter-spacing: .15em; padding: 2px 8px;
+        text-transform: uppercase; border: 1px solid; }
+.pill.open    { color: var(--amber); border-color: var(--amber-dim); }
+.pill.pending { color: var(--muted-2); border-color: var(--border-2); }
+.pill.closed  { color: var(--muted); border-color: var(--border); }
+
+.empty-state { font-size: .68rem; color: var(--muted); text-align: center;
+               padding: 20px 0; letter-spacing: .1em; }
+
+/* ─── Main panel ────────────────────────────────────────────────── */
+.main { display: flex; flex-direction: column; overflow: hidden; }
+
+.main-head {
+  padding: 18px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.main-title { font-family: 'Cormorant SC', serif; font-size: 1.3rem;
+              font-weight: 600; letter-spacing: .06em; color: var(--text); }
+.main-sub { font-size: .58rem; color: var(--muted); letter-spacing: .1em; margin-top: 2px; }
+
+.ctrl-row { display: flex; gap: 8px; }
+.btn-ctrl {
+  padding: 8px 18px; font-family: 'IBM Plex Mono', monospace;
+  font-size: .65rem; letter-spacing: .15em; text-transform: uppercase;
+  border: 1px solid; cursor: pointer; transition: background .15s, box-shadow .15s;
+  background: transparent;
+}
+.btn-ctrl.open-btn  { border-color: var(--amber-dim); color: var(--amber); }
+.btn-ctrl.open-btn:hover  { background: var(--amber-bg); box-shadow: 0 0 12px rgba(245,158,11,.2); }
+.btn-ctrl.close-btn { border-color: var(--border-2); color: var(--muted-2); }
+.btn-ctrl.close-btn:hover { background: var(--surface-3); }
+.btn-ctrl:disabled { opacity: .3; cursor: not-allowed; }
+
+/* Stats */
+.stats { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.stat { flex: 1; padding: 16px 20px; text-align: center;
+        border-right: 1px solid var(--border); }
+.stat:last-child { border-right: none; }
+.stat-n { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem;
+          line-height: 1; color: var(--amber); }
+.stat-n.green { color: var(--green); }
+.stat-n.dim   { color: var(--muted); }
+.stat-l { font-size: .55rem; letter-spacing: .2em; color: var(--muted);
+          text-transform: uppercase; margin-top: 3px; }
+
+/* Admit bar */
+.admit-bar {
+  padding: 12px 28px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.admit-bar label { font-size: .58rem; letter-spacing: .2em; color: var(--muted);
+                   text-transform: uppercase; }
+.admit-bar input {
+  width: 80px; background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: .8rem;
+  padding: 6px 10px; outline: none; text-align: center;
+}
+.admit-bar input:focus { border-color: var(--amber-dim); }
+.btn-admit {
+  padding: 7px 22px; background: var(--amber); border: none; color: var(--bg);
+  font-family: 'IBM Plex Mono', monospace; font-size: .7rem; font-weight: 500;
+  letter-spacing: .18em; text-transform: uppercase; cursor: pointer;
+  transition: background .2s, box-shadow .2s;
+}
+.btn-admit:hover { background: #FBBA2A; box-shadow: 0 0 14px rgba(245,158,11,.35); }
+
+.ws-badge { margin-left: auto; font-size: .6rem; letter-spacing: .1em; color: var(--muted); }
+.ws-badge.live { color: var(--green); }
+
+/* Table */
+.table-wrap {
+  flex: 1; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.table-wrap::-webkit-scrollbar { width: 4px; }
+.table-wrap::-webkit-scrollbar-thumb { background: var(--border); }
+
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky; top: 0; background: var(--surface); z-index: 10;
+  padding: 10px 16px; text-align: left;
+  font-size: .55rem; letter-spacing: .22em; color: var(--muted);
+  text-transform: uppercase; border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+tbody tr { border-bottom: 1px solid rgba(37,34,32,.6); transition: background .1s; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr.dim { opacity: .38; }
+td { padding: 10px 16px; font-size: .72rem; letter-spacing: .03em; }
+
+.rank-cell { color: var(--gold); font-weight: 500; width: 48px; }
+.user-cell { color: var(--text); max-width: 180px; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; }
+.time-cell { color: var(--muted-2); font-size: .65rem; }
+
+.tag { display: inline-block; padding: 2px 9px; font-size: .55rem;
+       letter-spacing: .15em; text-transform: uppercase; border: 1px solid; }
+.tag.waiting  { color: var(--amber); border-color: var(--amber-dim); }
+.tag.admitted { color: var(--green); border-color: rgba(16,185,129,.3); }
+.tag.expired  { color: var(--muted-2); border-color: var(--border-2); }
+.tag.cancelled{ color: var(--muted); border-color: var(--border); }
+
+/* Empty main */
+.empty-main {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px; color: var(--muted);
+}
+.empty-icon { font-size: 2rem; color: var(--border-2); }
+.empty-main p { font-size: .7rem; letter-spacing: .15em; }
+
+/* Toasts */
+.toasts { position: fixed; top: 18px; right: 18px; z-index: 1000;
+          display: flex; flex-direction: column; gap: 6px; }
+.toast {
+  padding: 10px 16px; background: var(--surface-2);
+  border-left: 3px solid var(--amber); font-size: .68rem; letter-spacing: .04em;
+  max-width: 300px; animation: tIn .2s ease, tOut .3s ease 2.7s forwards;
+}
+.toast.err { border-left-color: var(--red); }
+.toast.ok  { border-left-color: var(--green); }
+@keyframes tIn  { from { opacity:0; transform: translateX(10px); } }
+@keyframes tOut { to   { opacity:0; } }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="logo">Queue<em>Flow</em></div>
+      <div class="admin-chip">Admin</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">建立活動</div>
+      <form onsubmit="createEvent(event)">
+        <div class="field">
+          <label>活動名稱</label>
+          <input id="fName" type="text" placeholder="演唱會 2026" required>
+        </div>
+        <div class="field">
+          <label>容量（人）</label>
+          <input id="fCap" type="number" placeholder="1000" min="1" required>
+        </div>
+        <div class="field">
+          <label>開始時間（選填）</label>
+          <input id="fOpen" type="datetime-local">
+        </div>
+        <div class="field">
+          <label>結束時間（選填）</label>
+          <input id="fClose" type="datetime-local">
+        </div>
+        <button type="submit" class="btn-create">建立活動</button>
+      </form>
+    </div>
+
+    <div class="section" style="flex:1">
+      <div class="section-title">活動列表</div>
+      <div id="eventList"><div class="empty-state">尚無活動</div></div>
+    </div>
+  </aside>
+
+  <!-- ── Main Panel ─────────────────────────────────────────────── -->
+  <div class="main" id="mainPanel">
+
+    <!-- header -->
+    <div class="main-head">
+      <div>
+        <div class="main-title" id="mainTitle">選擇一個活動</div>
+        <div class="main-sub" id="mainSub">—</div>
+      </div>
+      <div class="ctrl-row" id="ctrlRow" style="display:none">
+        <button class="btn-ctrl open-btn"  id="btnOpen"  onclick="openEvent()">開放候補</button>
+        <button class="btn-ctrl close-btn" id="btnClose" onclick="closeEvent()">關閉候補</button>
+      </div>
+    </div>
+
+    <!-- stats -->
+    <div class="stats" id="statsRow" style="display:none">
+      <div class="stat"><div class="stat-n" id="sWait">0</div><div class="stat-l">等待中</div></div>
+      <div class="stat"><div class="stat-n green" id="sAdmt">0</div><div class="stat-l">已放行</div></div>
+      <div class="stat"><div class="stat-n dim" id="sOther">0</div><div class="stat-l">取消/逾時</div></div>
+      <div class="stat"><div class="stat-n dim" id="sTotal">0</div><div class="stat-l">總計</div></div>
+    </div>
+
+    <!-- admit bar -->
+    <div class="admit-bar" id="admitBar" style="display:none">
+      <label>放行數量</label>
+      <input id="admitN" type="number" value="10" min="1">
+      <button class="btn-admit" onclick="admitQueue()">放行</button>
+      <button class="btn-ctrl close-btn" style="padding:7px 14px" onclick="loadQueue()">重新整理</button>
+      <div class="ws-badge" id="wsBadge">未連線</div>
+    </div>
+
+    <!-- table -->
+    <div class="table-wrap" id="tableWrap" style="display:none">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>使用者 ID</th>
+            <th>加入時間</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- empty -->
+    <div class="empty-main" id="emptyMain">
+      <div class="empty-icon">◈</div>
+      <p>請從左側選擇活動</p>
+    </div>
+
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const A = { events: [], selId: null, selStatus: null, stomp: null };
+
+/* ── Create Event ── */
+async function createEvent(e) {
+  e.preventDefault();
+  const name = document.getElementById('fName').value;
+  const capacity = parseInt(document.getElementById('fCap').value);
+  const openRaw  = document.getElementById('fOpen').value;
+  const closeRaw = document.getElementById('fClose').value;
+
+  const body = { name, capacity };
+  if (openRaw)  body.openTime  = openRaw.length === 16 ? openRaw + ':00' : openRaw;
+  if (closeRaw) body.closeTime = closeRaw.length === 16 ? closeRaw + ':00' : closeRaw;
+
+  const r = await req('/api/admin/events', 'POST', body);
+  if (r.success) {
+    A.events.unshift(r.data);
+    renderList();
+    toast(`活動「${r.data.name}」建立成功`, 'ok');
+    e.target.reset();
+  } else {
+    toast(r.message || '建立失敗', 'err');
+  }
+}
+
+/* ── Open / Close ── */
+async function openEvent() {
+  const r = await req(`/api/admin/events/${A.selId}/open`, 'POST');
+  if (r.success) { patchStatus('OPEN'); toast('活動已開放候補', 'ok'); }
+  else toast(r.message || '失敗', 'err');
+}
+async function closeEvent() {
+  const r = await req(`/api/admin/events/${A.selId}/close`, 'POST');
+  if (r.success) { patchStatus('CLOSED'); toast('活動已關閉'); }
+  else toast(r.message || '失敗', 'err');
+}
+function patchStatus(status) {
+  A.selStatus = status;
+  const ev = A.events.find(e => e.id === A.selId);
+  if (ev) ev.status = status;
+  renderList(); renderCtrls();
+}
+
+/* ── Admit ── */
+async function admitQueue() {
+  const count = parseInt(document.getElementById('admitN').value);
+  if (!count || count <= 0) { toast('請輸入有效數量', 'err'); return; }
+  const r = await req(`/api/admin/events/${A.selId}/admit`, 'POST', { count });
+  if (r.success) { toast(`已放行 ${r.data} 人`, 'ok'); await loadQueue(); }
+  else toast(r.message || '放行失敗', 'err');
+}
+
+/* ── Select Event ── */
+async function selectEvent(id) {
+  A.selId = id;
+  const ev = A.events.find(e => e.id === id);
+  A.selStatus = ev?.status;
+
+  document.getElementById('mainTitle').textContent = ev?.name || '—';
+  document.getElementById('mainSub').textContent   = `ID: ${id}  ·  容量: ${ev?.capacity ?? '—'}`;
+  document.getElementById('emptyMain').style.display = 'none';
+  document.getElementById('statsRow').style.display  = 'flex';
+  document.getElementById('admitBar').style.display  = 'flex';
+  document.getElementById('tableWrap').style.display = 'block';
+  document.getElementById('ctrlRow').style.display   = 'flex';
+
+  renderCtrls(); renderList();
+  await loadQueue();
+  connectWs(id);
+}
+
+/* ── Load queue ── */
+async function loadQueue() {
+  const r = await req(`/api/admin/events/${A.selId}/queue`);
+  if (r.success) { renderTable(r.data); renderStats(r.data); }
+}
+
+/* ── Render helpers ── */
+function renderList() {
+  const el = document.getElementById('eventList');
+  if (!A.events.length) { el.innerHTML = '<div class="empty-state">尚無活動</div>'; return; }
+  const lbl = { PENDING:'待開放', OPEN:'進行中', CLOSED:'已關閉' };
+  const cls = { PENDING:'pending', OPEN:'open', CLOSED:'closed' };
+  el.innerHTML = A.events.map(ev => `
+    <div class="event-item ${ev.id === A.selId ? 'active' : ''}" onclick="selectEvent(${ev.id})">
+      <div class="ei-name">${ev.name}</div>
+      <div class="ei-meta">
+        <span class="ei-id">ID: ${ev.id}</span>
+        <span class="pill ${cls[ev.status]||'pending'}">${lbl[ev.status]||ev.status}</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderCtrls() {
+  document.getElementById('btnOpen').disabled  = A.selStatus === 'OPEN';
+  document.getElementById('btnClose').disabled = A.selStatus !== 'OPEN';
+}
+
+function renderStats(entries) {
+  const w = entries.filter(e => e.status === 'WAITING').length;
+  const a = entries.filter(e => e.status === 'ADMITTED').length;
+  const o = entries.filter(e => e.status === 'EXPIRED' || e.status === 'CANCELLED').length;
+  document.getElementById('sWait').textContent  = w;
+  document.getElementById('sAdmt').textContent  = a;
+  document.getElementById('sOther').textContent = o;
+  document.getElementById('sTotal').textContent = entries.length;
+}
+
+function renderTable(entries) {
+  const sorted = [...entries].sort((a, b) => {
+    if (a.status === 'WAITING' && b.status !== 'WAITING') return -1;
+    if (a.status !== 'WAITING' && b.status === 'WAITING') return 1;
+    return fmtSort(a.joinedAt) - fmtSort(b.joinedAt);
+  });
+  const lbl = { WAITING:'等待中', ADMITTED:'已放行', EXPIRED:'已逾時', CANCELLED:'已取消' };
+  let rank = 0;
+  document.getElementById('tbody').innerHTML = sorted.map(e => {
+    const isWait = e.status === 'WAITING';
+    if (isWait) rank++;
+    return `<tr class="${isWait ? '' : 'dim'}">
+      <td class="rank-cell">${isWait ? rank : '—'}</td>
+      <td class="user-cell" title="${e.userId}">${e.userId}</td>
+      <td class="time-cell">${fmtTime(e.joinedAt)}</td>
+      <td><span class="tag ${e.status.toLowerCase()}">${lbl[e.status]||e.status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function fmtTime(v) {
+  if (!v) return '—';
+  if (Array.isArray(v)) { const [,,,h,m,s=0] = v; return `${pad(h)}:${pad(m)}:${pad(s)}`; }
+  try { const d = new Date(v); return d.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  catch(_) { return v; }
+}
+function fmtSort(v) {
+  if (!v) return 0;
+  if (Array.isArray(v)) { const [y,mo,d,h=0,m=0,s=0] = v; return new Date(y,mo-1,d,h,m,s).getTime(); }
+  return new Date(v).getTime();
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+/* ── WebSocket ── */
+function connectWs(eventId) {
+  if (A.stomp) { try { A.stomp.deactivate(); } catch(_) {} }
+  const client = new StompJs.Client({
+    webSocketFactory: () => new SockJS('/ws'),
+    reconnectDelay: 5000,
+    onConnect: () => {
+      document.getElementById('wsBadge').textContent = '● 即時';
+      document.getElementById('wsBadge').className   = 'ws-badge live';
+      client.subscribe(`/topic/events/${eventId}/queue`, async () => {
+        if (A.selId === eventId) await loadQueue();
+      });
+    },
+    onDisconnect: () => {
+      document.getElementById('wsBadge').textContent = '已斷線';
+      document.getElementById('wsBadge').className   = 'ws-badge';
+    },
+  });
+  client.activate();
+  A.stomp = client;
+}
+
+/* ── Helpers ── */
+async function req(url, method = 'GET', body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  return r.json().catch(() => ({ success: false, message: 'Server error' }));
+}
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type; el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3100);
+}
+</script>
+</body>
+</html>

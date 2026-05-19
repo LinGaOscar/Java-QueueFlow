@@ -1,0 +1,17 @@
+# Maven
+target/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Spring Boot
+*.log
+logs/
+
+# 本地環境設定，不上版控
+src/main/resources/application-local.properties
