@@ -35,6 +35,11 @@ public class EventService {
         this.notificationService = notificationService;
     }
 
+    @Transactional(readOnly = true)
+    public List<QueueEvent> listEvents() {
+        return eventRepository.findAll();
+    }
+
     public QueueEvent createEvent(String name, Integer capacity,
                                   LocalDateTime openTime, LocalDateTime closeTime) {
         QueueEvent event = new QueueEvent();

@@ -120,6 +120,10 @@ WAITING → CANCELLED（使用者主動取消）
 
 ## 重要實作細節
 
+- **Schema 管理**：`spring.jpa.hibernate.ddl-auto=none`，Hibernate 不管理 schema；改由 `src/main/resources/schema.sql` 在每次啟動時由 Spring 自動執行（`spring.sql.init.mode=always` + `spring.jpa.defer-datasource-initialization=true`）。表格使用 `CREATE TABLE IF NOT EXISTS`，重複啟動安全。
+- **錯誤處理模式**：`AppException` 提供靜態工廠方法（`notFound` / `badRequest` / `conflict` / `tooManyRequests`）直接對應 HTTP 狀態碼；`GlobalExceptionHandler` 統一轉換為 `ApiResponse<Void>`。新增業務錯誤只需呼叫對應工廠方法，無需修改 Handler。
+- **`@Transactional` 範圍差異**：`EventService` 整個 class 加 `@Transactional`；`QueueService` 僅 `joinQueue`/`cancelQueue` 方法層級加，`getPosition` 用 `readOnly = true`，以明確控制讀寫分離。
+- **逾時排程**：`QueueExpiryScheduler` 以 `fixedDelay = 60_000`（每分鐘）掃描並失效已關閉活動的殘留 WAITING 記錄。`application.properties` 中的 `queue.expiry.minutes=30` 目前尚未被 Scheduler 引用（預留供未來參數化使用）。
 - **`QueueService.joinQueue`** 使用 `@Transactional` 同步寫入 DB，確保後續 cancel/admit 能立即查到記錄（Phase 2 可改為 Kafka 事件驅動非同步寫入）。
 - **多次入列查詢**：取消或放行後 Redis user key 被刪除，同一使用者可再次入列。Repository 使用 `findByEventIdAndUserIdAndStatus(..., WAITING)` 而非通用查詢，避免多筆記錄時拋出 non-unique-result exception。
 - **`/me` 歷史查詢**：Redis 無記錄時改用 `findFirstByEventIdAndUserIdOrderByJoinedAtDesc` 回傳最新終態。

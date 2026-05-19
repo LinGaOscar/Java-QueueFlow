@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -14,6 +15,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException e) {
         return ResponseEntity.status(e.getStatus()).body(ApiResponse.error(e.getMessage()));
+    }
+
+    // Spring Boot 3.2+ 靜態資源找不到時拋出此例外，不應視為系統錯誤
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error("找不到資源: " + e.getResourcePath()));
     }
 
     @ExceptionHandler(Exception.class)

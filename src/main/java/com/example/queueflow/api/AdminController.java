@@ -20,6 +20,11 @@ public class AdminController {
         this.eventService = eventService;
     }
 
+    @GetMapping("/events")
+    public ResponseEntity<ApiResponse<List<QueueEvent>>> listEvents() {
+        return ResponseEntity.ok(ApiResponse.ok(eventService.listEvents()));
+    }
+
     @PostMapping("/events")
     public ResponseEntity<ApiResponse<QueueEvent>> createEvent(@RequestBody CreateEventRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(
