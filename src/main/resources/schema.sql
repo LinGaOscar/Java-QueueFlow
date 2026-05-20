@@ -24,9 +24,13 @@ CREATE INDEX IF NOT EXISTS idx_queue_entry_event_status ON queue_entry(event_id,
 CREATE INDEX IF NOT EXISTS idx_queue_entry_expiry ON queue_entry(status, joined_at);
 
 CREATE TABLE IF NOT EXISTS queue_audit_log (
-    id         BIGSERIAL PRIMARY KEY,
-    entry_id   BIGINT      NOT NULL REFERENCES queue_entry(id),
-    action     VARCHAR(50) NOT NULL,
-    payload    TEXT,
-    created_at TIMESTAMP   NOT NULL DEFAULT NOW()
+    id              BIGSERIAL PRIMARY KEY,
+    entry_id        BIGINT       NOT NULL REFERENCES queue_entry(id),
+    action          VARCHAR(50)  NOT NULL,
+    payload         TEXT,
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    idempotency_key VARCHAR(128) UNIQUE
 );
+
+-- 為已存在的資料庫補上 idempotency_key（CREATE TABLE IF NOT EXISTS 不會為舊資料庫加欄位）
+ALTER TABLE queue_audit_log ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(128) UNIQUE;
