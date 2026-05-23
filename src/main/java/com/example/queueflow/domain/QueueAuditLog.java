@@ -27,6 +27,9 @@ public class QueueAuditLog {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(unique = true, length = 128)
+    private String idempotencyKey;
+
     public QueueAuditLog(Long entryId, String action, String payload) {
         this.entryId = entryId;
         this.action = action;

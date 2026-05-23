@@ -2,11 +2,10 @@ package com.example.queueflow.application;
 
 import com.example.queueflow.common.AppException;
 import com.example.queueflow.domain.*;
-import com.example.queueflow.infrastructure.QueueAuditLogRepository;
 import com.example.queueflow.infrastructure.QueueEntryRepository;
 import com.example.queueflow.infrastructure.QueueEventRepository;
 import com.example.queueflow.infrastructure.RedisQueueStore;
-import com.example.queueflow.realtime.QueueNotificationService;
+import com.example.queueflow.messaging.QueueEventProducer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,20 +18,17 @@ public class EventService {
 
     private final QueueEventRepository eventRepository;
     private final QueueEntryRepository entryRepository;
-    private final QueueAuditLogRepository auditLogRepository;
     private final RedisQueueStore redisStore;
-    private final QueueNotificationService notificationService;
+    private final QueueEventProducer producer;
 
     public EventService(QueueEventRepository eventRepository,
                         QueueEntryRepository entryRepository,
-                        QueueAuditLogRepository auditLogRepository,
                         RedisQueueStore redisStore,
-                        QueueNotificationService notificationService) {
+                        QueueEventProducer producer) {
         this.eventRepository = eventRepository;
         this.entryRepository = entryRepository;
-        this.auditLogRepository = auditLogRepository;
         this.redisStore = redisStore;
-        this.notificationService = notificationService;
+        this.producer = producer;
     }
 
     @Transactional(readOnly = true)
@@ -79,13 +75,14 @@ public class EventService {
                     entry.setStatus(EntryStatus.ADMITTED);
                     entry.setAdmittedAt(LocalDateTime.now());
                     entryRepository.save(entry);
-                    auditLogRepository.save(new QueueAuditLog(entry.getId(), "ADMITTED", null));
+                    // 個人通知：queueSize=null，NotificationConsumer 只推個人狀態
+                    producer.sendQueueAdmitted(eventId, userId, entry.getId(), null);
                 });
                 redisStore.removeFromQueue(eventId, userId);
-                notificationService.notifyUserStatus(userId, "ADMITTED");
                 admitted++;
             }
-            notificationService.notifyQueueUpdate(eventId, redisStore.getQueueSize(eventId));
+            // 批次結束後發一次隊列大小更新：userId=null, entryId=null，AuditConsumer 會 skip
+            producer.sendQueueAdmitted(eventId, null, null, redisStore.getQueueSize(eventId));
             return admitted;
         } finally {
             redisStore.releaseLock(eventId);

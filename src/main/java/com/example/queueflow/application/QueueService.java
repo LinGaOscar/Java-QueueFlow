@@ -3,14 +3,12 @@ package com.example.queueflow.application;
 import com.example.queueflow.common.AppException;
 import com.example.queueflow.domain.EntryStatus;
 import com.example.queueflow.domain.EventStatus;
-import com.example.queueflow.domain.QueueAuditLog;
 import com.example.queueflow.domain.QueueEntry;
 import com.example.queueflow.domain.QueueEvent;
-import com.example.queueflow.infrastructure.QueueAuditLogRepository;
 import com.example.queueflow.infrastructure.QueueEntryRepository;
 import com.example.queueflow.infrastructure.QueueEventRepository;
 import com.example.queueflow.infrastructure.RedisQueueStore;
-import com.example.queueflow.realtime.QueueNotificationService;
+import com.example.queueflow.messaging.QueueEventProducer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,24 +19,21 @@ public class QueueService {
 
     private final QueueEventRepository eventRepository;
     private final QueueEntryRepository entryRepository;
-    private final QueueAuditLogRepository auditLogRepository;
     private final RedisQueueStore redisStore;
-    private final QueueNotificationService notificationService;
+    private final QueueEventProducer producer;
 
     public QueueService(QueueEventRepository eventRepository,
                         QueueEntryRepository entryRepository,
-                        QueueAuditLogRepository auditLogRepository,
                         RedisQueueStore redisStore,
-                        QueueNotificationService notificationService) {
+                        QueueEventProducer producer) {
         this.eventRepository = eventRepository;
         this.entryRepository = entryRepository;
-        this.auditLogRepository = auditLogRepository;
         this.redisStore = redisStore;
-        this.notificationService = notificationService;
+        this.producer = producer;
     }
 
     // 同步寫入 DB：確保 cancel/admit 在 joinQueue 回應前已能查到此記錄，
-    // 避免非同步寫入造成的狀態不一致（Phase 2 可改為 Kafka 事件驅動）
+    // 避免非同步寫入造成的狀態不一致（Phase 2 已改為 Kafka 事件驅動副作用）
     @Transactional
     public PositionResponse joinQueue(Long eventId, String userId) {
         if (redisStore.isRateLimited(userId)) {
@@ -61,10 +56,9 @@ public class QueueService {
         entry.setEventId(eventId);
         entry.setUserId(userId);
         QueueEntry saved = entryRepository.save(entry);
-        auditLogRepository.save(new QueueAuditLog(saved.getId(), "JOIN", null));
 
         Long position = redisStore.getPosition(eventId, userId);
-        notificationService.notifyQueueUpdate(eventId, redisStore.getQueueSize(eventId));
+        producer.sendQueueCreated(eventId, userId, saved.getId(), redisStore.getQueueSize(eventId));
 
         return new PositionResponse(position, position - 1, "WAITING");
     }
@@ -94,10 +88,9 @@ public class QueueService {
                     entry.setStatus(EntryStatus.CANCELLED);
                     entry.setCancelledAt(LocalDateTime.now());
                     entryRepository.save(entry);
-                    auditLogRepository.save(new QueueAuditLog(entry.getId(), "CANCELLED", null));
+                    // removeFromQueue 已在 lambda 前執行，queueSize 已反映取消後狀態
+                    producer.sendQueueCancelled(eventId, userId, entry.getId(), redisStore.getQueueSize(eventId));
                 });
-
-        notificationService.notifyQueueUpdate(eventId, redisStore.getQueueSize(eventId));
     }
 
     public record PositionResponse(long position, long ahead, String status) {}
